@@ -1,33 +1,183 @@
-import { StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ProfileRow } from '@/components/profile/ProfileRow';
+import { ProfileSection } from '@/components/profile/ProfileSection';
+import { ProfileSummaryCard } from '@/components/profile/ProfileSummaryCard';
 import { Screen } from '@/components/Screen';
 
 export default function ProfileScreen() {
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [anonymousMode, setAnonymousMode] = useState(false);
+
   return (
-    <Screen backgroundColor="#FFFFFF">
+    <Screen backgroundColor="#F9FAFB" scrollable>
+      <View style={styles.header}>
+        <Pressable
+          onPress={() => router.back()}
+          style={styles.headerButton}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
+          <Ionicons name="arrow-back" size={24} color="#9CA3AF" />
+        </Pressable>
+        <Text style={styles.headerTitle}>My Profile</Text>
+        <Pressable
+          style={styles.headerButton}
+          accessibilityLabel="Notifications"
+          accessibilityRole="button"
+        >
+          <View>
+            <Ionicons name="notifications-outline" size={24} color="#9CA3AF" />
+            <View style={styles.badge} />
+          </View>
+        </Pressable>
+      </View>
+
       <View style={styles.content}>
-        <Text style={styles.title}>Profile</Text>
-        <Text style={styles.subtitle}>Your profile and settings</Text>
+        <ProfileSummaryCard />
+
+        <ProfileSection title="User info">
+          <ProfileRow
+            icon="person-outline"
+            title="Personal Information"
+            subtitle="Edit your name, email, phone & change location"
+            onPress={() => {}}
+            isLast
+          />
+        </ProfileSection>
+
+        <ProfileSection title="Settings">
+          <ProfileRow
+            icon="notifications-outline"
+            title="Push Notifications"
+            showArrow={false}
+            showToggle
+            toggleValue={pushNotifications}
+            onToggleChange={setPushNotifications}
+          />
+          <ProfileRow
+            icon="sync-outline"
+            title="Anonymous Mode"
+            subtitle="Your personal details are hidden"
+            showArrow={false}
+            showToggle
+            toggleValue={anonymousMode}
+            onToggleChange={setAnonymousMode}
+          />
+          <ProfileRow
+            icon="card-outline"
+            title="Payment Cards"
+            subtitle="Add or manage your cards"
+            onPress={() => {}}
+          />
+          <ProfileRow
+            icon="lock-closed-outline"
+            title="Security"
+            subtitle="Password & authentication"
+            onPress={() => {}}
+          />
+          <ProfileRow
+            icon="settings-outline"
+            title="Account Settings"
+            subtitle="Preferences"
+            onPress={() => {}}
+            isLast
+          />
+        </ProfileSection>
+
+        <ProfileSection title="Support">
+          <ProfileRow
+            icon="help-circle-outline"
+            title="Help Center"
+            subtitle="FAQs and guides"
+            onPress={() => {}}
+          />
+          <ProfileRow
+            icon="document-text-outline"
+            title="Terms & Privacy"
+            onPress={() => {}}
+            isLast
+          />
+        </ProfileSection>
+
+        <Pressable
+          style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
+          onPress={() => router.replace('/(public)/welcome' as import('expo-router').Href)}
+          accessibilityRole="button"
+          accessibilityLabel="Log out"
+        >
+          <Ionicons name="log-out-outline" size={22} color="#DC2626" />
+          <Text style={styles.logoutText}>Log Out</Text>
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+        </Pressable>
+
+        <Text style={styles.version}>Pliz v1.0.0</Text>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    justifyContent: 'center',
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 24,
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 24,
+  headerButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#1F2937',
-    marginBottom: 8,
   },
-  subtitle: {
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#2E8BEA',
+  },
+  content: {
+    paddingBottom: 32,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  pressed: {
+    opacity: 0.8,
+  },
+  logoutText: {
+    flex: 1,
     fontSize: 16,
-    color: '#6B7280',
+    fontWeight: '600',
+    color: '#DC2626',
+    marginLeft: 12,
+  },
+  version: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
 });

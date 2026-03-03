@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -19,6 +20,8 @@ export interface PrimaryButtonProps {
   backgroundColor?: string;
   /** When true, button is not clickable and appears disabled */
   disabled?: boolean;
+  /** Optional icon to show on the right of the label */
+  rightIcon?: keyof typeof Ionicons.glyphMap;
 }
 
 export function PrimaryButton({
@@ -28,8 +31,18 @@ export function PrimaryButton({
   variant = 'gradient',
   backgroundColor = DEFAULT_SOLID_BG,
   disabled = false,
+  rightIcon,
 }: PrimaryButtonProps) {
   const isSolid = variant === 'solid';
+
+  const content = (
+    <>
+      <Text style={styles.label}>{label}</Text>
+      {rightIcon && (
+        <Ionicons name={rightIcon} size={20} color="#FFFFFF" style={styles.rightIcon} />
+      )}
+    </>
+  );
 
   return (
     <Pressable
@@ -44,9 +57,7 @@ export function PrimaryButton({
       accessibilityState={{ disabled }}
     >
       {isSolid ? (
-        <View style={[styles.gradient, { backgroundColor }]}>
-          <Text style={styles.label}>{label}</Text>
-        </View>
+        <View style={[styles.gradient, { backgroundColor }]}>{content}</View>
       ) : (
         <LinearGradient
           colors={[...GRADIENT_COLORS]}
@@ -54,7 +65,7 @@ export function PrimaryButton({
           end={{ x: 1, y: 0 }}
           style={styles.gradient}
         >
-          <Text style={styles.label}>{label}</Text>
+          {content}
         </LinearGradient>
       )}
     </Pressable>
@@ -76,6 +87,7 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -83,5 +95,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 17,
     fontWeight: '700',
+  },
+  rightIcon: {
+    marginLeft: 8,
   },
 });

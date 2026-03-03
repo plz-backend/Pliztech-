@@ -65,3 +65,64 @@ export const MOCK_RECENT_CONTRIBUTIONS = [
 ] as const;
 
 export type RecentContribution = (typeof MOCK_RECENT_CONTRIBUTIONS)[number];
+
+export const MOCK_BROWSE_REQUESTS = [
+  {
+    id: '1',
+    name: 'Adaeze O',
+    initial: 'A',
+    avatarColor: '#93C5FD',
+    timeLeft: '2h left',
+    categoryId: 'transport',
+    categoryLabel: 'Transport',
+    badge: '3 requests',
+    text: 'Need help with transport fare to get to my new job interview in Ikeja tomorrow morning.',
+    raised: 3200,
+    goal: 5000,
+    percent: 64,
+  },
+  {
+    id: '2',
+    name: 'Chidi E.',
+    initial: 'C',
+    avatarColor: '#F59E0B',
+    timeLeft: '18h left',
+    categoryId: 'health',
+    categoryLabel: 'Health & Personal Care',
+    badge: 'New',
+    text: 'Need assistance with medical bills for my mother\'s checkup. Every little bit helps.',
+    raised: 6300,
+    goal: 10000,
+    percent: 63,
+  },
+  {
+    id: '3',
+    name: 'Tobias C.',
+    initial: 'T',
+    avatarColor: '#86EFAC',
+    timeLeft: '36h left',
+    categoryId: 'education',
+    categoryLabel: 'Education & Skills',
+    badge: 'New',
+    text: 'Need help with school fees for my final semester. I\'m so close to graduating.',
+    raised: 12000,
+    goal: 25000,
+    percent: 48,
+  },
+  {
+    id: '4',
+    name: 'Racheal I.',
+    initial: 'R',
+    avatarColor: '#E9D5FF',
+    timeLeft: '52h left',
+    categoryId: 'rent',
+    categoryLabel: 'Rent & Utilities',
+    badge: '5 requests',
+    text: 'Struggling to pay rent this month after unexpected expenses. Any support appreciated.',
+    raised: 14000,
+    goal: 50000,
+    percent: 28,
+  },
+] as const;
+
+export type BrowseRequest = (typeof MOCK_BROWSE_REQUESTS)[number];
