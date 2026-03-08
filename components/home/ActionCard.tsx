@@ -113,6 +113,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 4,
+    textAlign: 'center',
   },
   titleLight: {
     color: '#FFFFFF',
@@ -122,6 +123,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 13,
+    textAlign: 'center',
   },
   subtitleLight: {
     color: 'rgba(255,255,255,0.9)',
