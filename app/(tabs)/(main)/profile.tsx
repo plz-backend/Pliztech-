@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { ProfileRow } from '@/components/profile/ProfileRow';
 import { ProfileSection } from '@/components/profile/ProfileSection';

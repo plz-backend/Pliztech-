@@ -1,6 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { Screen } from '@/components/Screen';

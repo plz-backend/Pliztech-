@@ -6,10 +6,11 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressBar } from '@/components/ProgressBar';

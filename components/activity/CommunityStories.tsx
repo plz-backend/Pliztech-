@@ -7,9 +7,10 @@ import {
   NativeScrollEvent,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { StoryCard } from '@/components/activity/StoryCard';
 import { MOCK_COMMUNITY_STORIES } from '@/mock/activity';

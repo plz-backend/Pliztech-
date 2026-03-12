@@ -4,10 +4,11 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+
+import { Text } from '@/components/Text';
 import { useEffect, useState } from 'react';
 
 import { PrimaryButton } from '@/components/PrimaryButton';

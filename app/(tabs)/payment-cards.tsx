@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { AddCardModal } from '@/components/payment/AddCardModal';
 import { Screen } from '@/components/Screen';

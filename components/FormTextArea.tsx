@@ -1,6 +1,8 @@
 import type { ComponentProps } from 'react';
 import { useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, StyleSheet, TextInput, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 const BORDER_RADIUS = 15;
 const BORDER_COLOR = '#D1D5DB';

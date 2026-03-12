@@ -1,5 +1,8 @@
+import { CTA_GRADIENT } from '@/constants/cta-buttons';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 const HEIGHT = 56;
 const BORDER_RADIUS = 999;
@@ -47,23 +50,26 @@ export function SocialButton({
 
 const styles = StyleSheet.create({
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: BORDER_COLOR,
-    borderRadius: BORDER_RADIUS,
-    minHeight: HEIGHT,
     width: '100%',
+    maxWidth: CTA_GRADIENT.width,
+    height: CTA_GRADIENT.height,
+    borderRadius: CTA_GRADIENT.borderRadius,
+    overflow: 'hidden',
+    paddingVertical: CTA_GRADIENT.paddingVertical,
+    paddingHorizontal: CTA_GRADIENT.paddingHorizontal,
+    borderColor: BORDER_COLOR,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+    flexDirection: 'row',
   },
   buttonPressed: {
     opacity: 0.8,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
+    width: 26,
+    height: 26,
     borderRadius: 18,
     backgroundColor: 'rgba(0,0,0,0.06)',
     alignItems: 'center',

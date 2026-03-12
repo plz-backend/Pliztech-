@@ -8,10 +8,11 @@ import {
   Pressable,
   StyleSheet,
   Switch,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+
+import { Text } from '@/components/Text';
 import { z } from 'zod';
 
 import { CategoryChip } from '@/components/create/CategoryChip';

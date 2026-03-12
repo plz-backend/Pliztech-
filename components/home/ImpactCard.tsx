@@ -1,6 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 const GRADIENT_COLORS = ['#2E8BEA', '#172033'] as const;
 

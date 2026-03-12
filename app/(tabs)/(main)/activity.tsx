@@ -2,7 +2,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { ActivityRequestCard } from '@/components/activity/ActivityRequestCard';
 import { ActivityTypeFilters, type ActivityType } from '@/components/activity/ActivityTypeFilters';

@@ -1,4 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 export interface ProfileSectionProps {
   title: string;

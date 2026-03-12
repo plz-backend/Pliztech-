@@ -5,9 +5,10 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { Screen } from '@/components/Screen';
 import {

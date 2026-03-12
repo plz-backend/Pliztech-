@@ -1,4 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 const HEADING = '#1F2937';
 const BODY = '#6B7280';

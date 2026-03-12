@@ -1,5 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 export interface ProfileRowProps {
   icon: keyof typeof Ionicons.glyphMap;

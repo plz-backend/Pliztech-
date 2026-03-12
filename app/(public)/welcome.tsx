@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { BackgroundImageScreen } from '@/components/BackgroundImageScreen';
-import { PrimaryButton } from '@/components/PrimaryButton';
-import { SecondaryButton } from '@/components/SecondaryButton';
+import { CTAButton } from '@/components/CTAButton';
 
 const WELCOME_BG = require('@/assets/images/welcome-bg.png');
 
@@ -34,15 +35,16 @@ export default function WelcomeScreen() {
           Join a community where small acts of kindness make a world of difference
         </Text>
         <View style={styles.buttons}>
-          <PrimaryButton
+          <CTAButton
             label="Login"
             onPress={onLogin}
             variant="gradient"
             accessibilityLabel="Go to login"
           />
-          <SecondaryButton
+          <CTAButton
             label="Register"
             onPress={onRegister}
+            variant="white"
             accessibilityLabel="Go to register"
           />
         </View>

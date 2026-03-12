@@ -1,14 +1,24 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps } from 'react';
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  type StyleProp,
+  type ViewStyle,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
-const INPUT_HEIGHT = 56;
+import { Text } from '@/components/Text';
+
+const INPUT_HEIGHT = 50;
 const BORDER_RADIUS = 15;
-const BORDER_COLOR = '#D1D5DB';
+const BORDER_COLOR = '#9EA2AD';
 const HOVER_FOCUS_BORDER_COLOR = '#1766D1';
-const ERROR_COLOR = '#DC2626';
-const LABEL_COLOR = '#1F2937';
+const ERROR_COLOR = '#FF0000';
+const LABEL_COLOR = '#172033';
 const BODY_COLOR = '#6B7280';
 const INPUT_TEXT_COLOR = '#111827';
 
@@ -23,7 +33,7 @@ export interface FormTextInputProps
   error?: string;
   /** Hint text below input (lighter gray, for guidance) */
   hint?: string;
-  containerStyle?: ComponentProps<View>['style'];
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
 export function FormTextInput({
@@ -60,8 +70,10 @@ export function FormTextInput({
           { borderColor },
           error ? styles.inputWrapperError : undefined,
         ]}
-        onMouseEnter={Platform.OS === 'web' ? () => setIsHovered(true) : undefined}
-        onMouseLeave={Platform.OS === 'web' ? () => setIsHovered(false) : undefined}
+        {...(Platform.OS === 'web' && {
+          onMouseEnter: () => setIsHovered(true),
+          onMouseLeave: () => setIsHovered(false),
+        })}
       >
         {leftIcon != null && (
           <Ionicons

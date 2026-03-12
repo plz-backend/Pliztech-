@@ -1,6 +1,8 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { PageDots } from '@/components/PageDots';
 import { PrimaryButton } from '@/components/PrimaryButton';

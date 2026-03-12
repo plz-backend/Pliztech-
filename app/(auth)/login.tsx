@@ -1,13 +1,16 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 import { z } from 'zod';
 
+import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
-import { PrimaryButton } from '@/components/PrimaryButton';
 import { Screen } from '@/components/Screen';
 import { SocialButton } from '@/components/SocialButton';
 
@@ -30,6 +33,7 @@ const COLORS = {
 
 export default function LoginScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const {
     control,
@@ -42,7 +46,7 @@ export default function LoginScreen() {
 
   const onSignIn = (data: LoginFormData) => {
     // Stub: replace with real auth later
-    console.log('Sign in', data);
+    console.log('Sign in', data, { rememberMe });
     router.replace('/(tabs)' as import('expo-router').Href);
   };
 
@@ -116,16 +120,31 @@ export default function LoginScreen() {
               )}
             />
 
-            <Pressable
-              onPress={onForgotPassword}
-              style={styles.forgotLinkWrap}
-              accessibilityLabel="Forgot password"
-              accessibilityRole="link"
-            >
-              <Text style={styles.forgotLink}>Forgot Password?</Text>
-            </Pressable>
+            <View style={styles.rememberForgotRow}>
+              <Pressable
+                onPress={() => setRememberMe((v) => !v)}
+                style={styles.rememberRow}
+                accessibilityLabel="Remember me"
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: rememberMe }}
+              >
+                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                  {rememberMe && (
+                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                  )}
+                </View>
+                <Text style={styles.rememberLabel}>Remember me</Text>
+              </Pressable>
+              <Pressable
+                onPress={onForgotPassword}
+                accessibilityLabel="Forgot password"
+                accessibilityRole="link"
+              >
+                <Text style={styles.forgotLink}>Forgot Password?</Text>
+              </Pressable>
+            </View>
 
-            <PrimaryButton
+            <CTAButton
               label="Sign In"
               onPress={handleSubmit(onSignIn)}
               variant="gradient"
@@ -165,22 +184,21 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 8,
   },
   logo: {
     width: 72,
     height: 72,
-    marginBottom: 8,
   },
   appName: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: COLORS.brandBlue,
     alignSelf: 'flex-start',
     marginBottom: 8,
   },
   welcomeTitle: {
-    fontSize: 26,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.heading,
     marginBottom: 8,
@@ -188,7 +206,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   welcomeSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.body,
     marginBottom: 28,
     textAlign: 'left',
@@ -198,9 +216,35 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 8,
   },
-  forgotLinkWrap: {
-    alignSelf: 'flex-end',
+  rememberForgotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
     marginBottom: 24,
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: COLORS.body,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: COLORS.brandBlue,
+    borderColor: COLORS.brandBlue,
+  },
+  rememberLabel: {
+    fontSize: 15,
+    color: COLORS.heading,
+    fontWeight: '500',
   },
   forgotLink: {
     fontSize: 14,

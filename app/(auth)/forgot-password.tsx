@@ -3,7 +3,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 import { z } from 'zod';
 
 import { FormTextInput } from '@/components/FormTextInput';

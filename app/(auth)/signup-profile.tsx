@@ -4,11 +4,13 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 import { z } from 'zod';
 
+import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
-import { PrimaryButton } from '@/components/PrimaryButton';
 import { Screen } from '@/components/Screen';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
@@ -206,11 +208,10 @@ export default function SignupProfileScreen() {
           </View>
           {consentError ? <Text style={styles.consentError}>{consentError}</Text> : null}
 
-          <PrimaryButton
+          <CTAButton
             label="Continue"
             onPress={handleSubmit(onContinue)}
-            variant="solid"
-            backgroundColor="#5C6B7A"
+            variant="gradient"
             disabled={!canSubmit}
             accessibilityLabel="Continue"
           />
@@ -245,21 +246,21 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 8,
   },
   logo: {
-    width: 48,
-    height: 48,
+    width: 72,
+    height: 72,
   },
   appName: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: COLORS.brandBlue,
     alignSelf: 'flex-start',
     marginBottom: 8,
   },
   title: {
-    fontSize: 26,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.heading,
     marginBottom: 8,
@@ -267,7 +268,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.body,
     marginBottom: 28,
     textAlign: 'left',

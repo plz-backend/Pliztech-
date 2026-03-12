@@ -1,5 +1,7 @@
 import { Link } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 
 import { ProgressBar } from '@/components/ProgressBar';
 

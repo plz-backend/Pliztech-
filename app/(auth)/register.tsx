@@ -3,11 +3,13 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { Text } from '@/components/Text';
 import { z } from 'zod';
 
+import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
-import { PrimaryButton } from '@/components/PrimaryButton';
 import { Screen } from '@/components/Screen';
 import { SocialButton } from '@/components/SocialButton';
 
@@ -113,8 +115,8 @@ export default function RegisterScreen() {
               )}
             />
 
-            <PrimaryButton
-              label="Sign Up"
+            <CTAButton
+              label="Sign up"
               onPress={handleSubmit(onSignUp)}
               variant="gradient"
               accessibilityLabel="Sign up"
@@ -153,22 +155,21 @@ const styles = StyleSheet.create({
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 8,
   },
   logo: {
     width: 72,
     height: 72,
-    marginBottom: 8,
   },
   appName: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: COLORS.brandBlue,
     alignSelf: 'flex-start',
     marginBottom: 8,
   },
   title: {
-    fontSize: 26,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.heading,
     marginBottom: 8,
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.body,
     marginBottom: 28,
     textAlign: 'left',
