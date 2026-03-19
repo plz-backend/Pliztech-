@@ -1,10 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { Text } from '@/components/Text';
 import { z } from 'zod';
@@ -12,14 +18,35 @@ import { z } from 'zod';
 import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
 import { Screen } from '@/components/Screen';
+import { completeProfile } from '@/lib/api/profile';
+import { PlizApiError } from '@/lib/api/types';
+import { getAccessToken } from '@/lib/auth/access-token';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
+/** E.164 — matches pliz-backend completeProfileValidation */
+const E164_REGEX = /^\+?[1-9]\d{1,14}$/;
+
 const profileSchema = z.object({
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  displayName: z.string().min(1, 'Display name is required'),
-  phoneNumber: z.string().optional(),
+  firstName: z
+    .string()
+    .min(1, 'First name is required')
+    .min(2, 'First name must be at least 2 characters')
+    .max(100, 'First name is too long'),
+  middleName: z.string().max(100, 'Middle name is too long').optional(),
+  lastName: z
+    .string()
+    .min(1, 'Last name is required')
+    .min(2, 'Last name must be at least 2 characters')
+    .max(100, 'Last name is too long'),
+  displayName: z.string().max(150, 'Display name is too long').optional(),
+  phoneNumber: z
+    .string()
+    .min(1, 'Phone number is required')
+    .regex(
+      E164_REGEX,
+      'Use international format, e.g. +2348012345678 (country code, no spaces)'
+    ),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -30,36 +57,102 @@ const COLORS = {
   heading: '#1F2937',
   body: '#6B7280',
   link: '#2E8BEA',
+  error: '#DC2626',
 } as const;
 
 export default function SignupProfileScreen() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
+  const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const [tokenChecked, setTokenChecked] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiMessage, setApiMessage] = useState<string | null>(null);
+
+  const refreshToken = useCallback(async () => {
+    setTokenChecked(false);
+    const token = await getAccessToken();
+    setAccessTokenState(token);
+    setTokenChecked(true);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshToken();
+    }, [refreshToken])
+  );
 
   const {
     control,
     handleSubmit,
-    watch,
+    setError,
     formState: { errors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       firstName: '',
+      middleName: '',
       lastName: '',
       displayName: '',
       phoneNumber: '',
     },
   });
 
-  const onContinue = (data: ProfileFormData) => {
+  const applyApiFieldErrors = (err: PlizApiError) => {
+    const fieldMap: Record<string, keyof ProfileFormData> = {
+      firstName: 'firstName',
+      middleName: 'middleName',
+      lastName: 'lastName',
+      phoneNumber: 'phoneNumber',
+      displayName: 'displayName',
+      agreeToTerms: 'firstName', // fallback
+    };
+    for (const item of err.errors) {
+      const key = fieldMap[item.field];
+      if (key) {
+        setError(key, { type: 'server', message: item.message });
+      }
+    }
+  };
+
+  const onContinue = async (data: ProfileFormData) => {
+    if (!accessToken) {
+      setApiMessage('Sign in to complete your profile.');
+      return;
+    }
     if (!consentChecked) {
       setConsentError('You must agree to the Terms of Service and Privacy Policy');
       return;
     }
     setConsentError(null);
-    // Stub: replace with API call to save profile
-    console.log('Profile data', data);
-    router.replace('/(tabs)' as import('expo-router').Href);
+    setApiMessage(null);
+    setIsSubmitting(true);
+    try {
+      await completeProfile(accessToken, {
+        firstName: data.firstName,
+        middleName: data.middleName?.trim() || undefined,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber.trim(),
+        displayName: data.displayName?.trim() || undefined,
+        agreeToTerms: true,
+        isAnonymous: false,
+      });
+      router.replace('/(tabs)' as import('expo-router').Href);
+    } catch (e) {
+      if (e instanceof PlizApiError) {
+        applyApiFieldErrors(e);
+        if (e.errors.length === 0) {
+          setApiMessage(e.message);
+        }
+        if (e.status === 401) {
+          setApiMessage('Your session expired. Please sign in again.');
+          setAccessTokenState(null);
+        }
+      } else {
+        setApiMessage('Something went wrong. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const onBack = () => {
@@ -74,14 +167,11 @@ export default function SignupProfileScreen() {
     Linking.openURL('https://example.com/privacy');
   };
 
-  const firstName = watch('firstName');
-  const lastName = watch('lastName');
-  const displayName = watch('displayName');
-  const allRequiredFilled =
-    Boolean(firstName?.trim()) &&
-    Boolean(lastName?.trim()) &&
-    Boolean(displayName?.trim());
-  const canSubmit = allRequiredFilled && consentChecked;
+  const onGoToLogin = () => {
+    router.push('/(auth)/login' as import('expo-router').Href);
+  };
+
+  const needsSignIn = tokenChecked && !accessToken;
 
   return (
     <Screen backgroundColor={COLORS.background} scrollable>
@@ -105,6 +195,28 @@ export default function SignupProfileScreen() {
         <Text style={styles.title}>Tell us about yourself</Text>
         <Text style={styles.subtitle}>This helps build trust in our community</Text>
 
+        {!tokenChecked ? (
+          <ActivityIndicator color={COLORS.brandBlue} style={styles.tokenLoading} />
+        ) : null}
+
+        {needsSignIn ? (
+          <View style={styles.authBanner}>
+            <Text style={styles.authBannerText}>
+              Sign in with a verified account to complete your profile. After registering, check your
+              email to verify, then sign in.
+            </Text>
+            <Pressable onPress={onGoToLogin} style={styles.authBannerButton} accessibilityRole="button">
+              <Text style={styles.authBannerButtonText}>Go to sign in</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {apiMessage ? (
+          <Text style={styles.apiError} accessibilityLiveRegion="polite">
+            {apiMessage}
+          </Text>
+        ) : null}
+
         <View style={styles.form}>
           <Controller
             control={control}
@@ -119,6 +231,25 @@ export default function SignupProfileScreen() {
                 autoCapitalize="words"
                 error={errors.firstName?.message}
                 accessibilityLabel="First name"
+                editable={!needsSignIn}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="middleName"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextInput
+                label="Middle Name (optional)"
+                placeholder="Michael"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                autoCapitalize="words"
+                error={errors.middleName?.message}
+                accessibilityLabel="Middle name"
+                editable={!needsSignIn}
               />
             )}
           />
@@ -136,6 +267,7 @@ export default function SignupProfileScreen() {
                 autoCapitalize="words"
                 error={errors.lastName?.message}
                 accessibilityLabel="Last name"
+                editable={!needsSignIn}
               />
             )}
           />
@@ -145,14 +277,15 @@ export default function SignupProfileScreen() {
             name="displayName"
             render={({ field: { onChange, onBlur, value } }) => (
               <FormTextInput
-                label="Display Name"
-                placeholder="eg. Johnny Doe"
+                label="Display Name (optional)"
+                placeholder="Defaults to your first and last name"
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
                 autoCapitalize="words"
                 error={errors.displayName?.message}
                 accessibilityLabel="Display name"
+                editable={!needsSignIn}
               />
             )}
           />
@@ -162,15 +295,16 @@ export default function SignupProfileScreen() {
             name="phoneNumber"
             render={({ field: { onChange, onBlur, value } }) => (
               <FormTextInput
-                label="Phone Number (optional)"
-                placeholder="+234"
+                label="Phone Number"
+                placeholder="+2348012345678"
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
                 keyboardType="phone-pad"
-                hint="For account recovery and security alerts"
+                hint="International format (E.164), e.g. +234…"
                 error={errors.phoneNumber?.message}
                 accessibilityLabel="Phone number"
+                editable={!needsSignIn}
               />
             )}
           />
@@ -178,13 +312,14 @@ export default function SignupProfileScreen() {
           <View style={styles.consentRow}>
             <Pressable
               onPress={() => {
+                if (needsSignIn) return;
                 setConsentChecked((c) => !c);
                 setConsentError(null);
               }}
               style={styles.checkboxTouch}
               accessibilityLabel={consentChecked ? 'Consent checked' : 'Consent unchecked'}
               accessibilityRole="checkbox"
-              accessibilityState={{ checked: consentChecked }}
+              accessibilityState={{ checked: consentChecked, disabled: needsSignIn }}
             >
               <Ionicons
                 name={consentChecked ? 'checkmark-circle' : 'ellipse-outline'}
@@ -209,12 +344,15 @@ export default function SignupProfileScreen() {
           {consentError ? <Text style={styles.consentError}>{consentError}</Text> : null}
 
           <CTAButton
-            label="Continue"
+            label={isSubmitting ? 'Saving…' : 'Continue'}
             onPress={handleSubmit(onContinue)}
             variant="gradient"
-            disabled={!canSubmit}
+            disabled={needsSignIn || !tokenChecked || isSubmitting}
             accessibilityLabel="Continue"
           />
+          {isSubmitting ? (
+            <ActivityIndicator color={COLORS.brandBlue} style={styles.spinner} />
+          ) : null}
         </View>
       </View>
     </Screen>
@@ -274,9 +412,49 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     alignSelf: 'stretch',
   },
+  tokenLoading: {
+    marginBottom: 16,
+  },
+  authBanner: {
+    alignSelf: 'stretch',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  authBannerText: {
+    fontSize: 14,
+    color: COLORS.heading,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  authBannerButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: COLORS.brandBlue,
+    borderRadius: 8,
+  },
+  authBannerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  apiError: {
+    alignSelf: 'stretch',
+    fontSize: 14,
+    color: COLORS.error,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   form: {
     width: '100%',
     marginBottom: 8,
+  },
+  spinner: {
+    marginTop: 12,
   },
   consentRow: {
     flexDirection: 'row',

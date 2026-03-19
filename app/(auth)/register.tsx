@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 import { z } from 'zod';
@@ -12,16 +12,38 @@ import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
 import { Screen } from '@/components/Screen';
 import { SocialButton } from '@/components/SocialButton';
+import { signup } from '@/lib/api/auth';
+import { PlizApiError } from '@/lib/api/types';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
-const signupSchema = z.object({
-  email: z.string().min(1, 'Email is required').email('Enter a valid email'),
-  password: z
-    .string()
-    .min(1, 'Password is required')
-    .min(8, 'Password must be at least 8 characters'),
-});
+/** Aligns with pliz-backend signupValidation + API docs */
+const PASSWORD_COMPLEXITY_MESSAGE =
+  'Use 8+ characters with upper & lower case, a number, and a special character (@$!%*?&#)';
+
+const signupSchema = z
+  .object({
+    username: z
+      .string()
+      .min(1, 'Username is required')
+      .min(3, 'Username must be at least 3 characters')
+      .max(50, 'Username must be at most 50 characters')
+      .regex(/^[a-zA-Z0-9_]+$/, 'Only letters, numbers, and underscores'),
+    email: z.string().min(1, 'Email is required').email('Enter a valid email'),
+    password: z
+      .string()
+      .min(1, 'Password is required')
+      .min(8, 'Password must be at least 8 characters')
+      .regex(
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]+$/,
+        PASSWORD_COMPLEXITY_MESSAGE
+      ),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
 type SignupFormData = z.infer<typeof signupSchema>;
 
@@ -31,24 +53,71 @@ const COLORS = {
   heading: '#1F2937',
   body: '#6B7280',
   link: '#2E8BEA',
+  error: '#DC2626',
 } as const;
 
 export default function RegisterScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiMessage, setApiMessage] = useState<string | null>(null);
 
   const {
     control,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: {
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
   });
 
-  const onSignUp = (data: SignupFormData) => {
-    // Stub: replace with real auth later
-    console.log('Sign up', data);
-    router.push('/(auth)/signup-profile' as import('expo-router').Href);
+  const applyApiFieldErrors = (err: PlizApiError) => {
+    const fieldMap: Record<string, keyof SignupFormData> = {
+      username: 'username',
+      email: 'email',
+      password: 'password',
+      confirmPassword: 'confirmPassword',
+    };
+    for (const item of err.errors) {
+      const key = fieldMap[item.field];
+      if (key) {
+        setError(key, { type: 'server', message: item.message });
+      }
+    }
+  };
+
+  const onSignUp = async (data: SignupFormData) => {
+    setApiMessage(null);
+    setIsSubmitting(true);
+    try {
+      await signup({
+        username: data.username.trim(),
+        email: data.email.trim(),
+        password: data.password,
+        confirmPassword: data.confirmPassword,
+      });
+      router.replace({
+        pathname: '/(auth)/login',
+        params: { registered: '1' },
+      } as import('expo-router').Href);
+    } catch (e) {
+      if (e instanceof PlizApiError) {
+        applyApiFieldErrors(e);
+        if (e.errors.length === 0) {
+          setApiMessage(e.message);
+        }
+      } else {
+        setApiMessage('Something went wrong. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const onApple = () => {
@@ -66,81 +135,132 @@ export default function RegisterScreen() {
   return (
     <Screen backgroundColor={COLORS.background} scrollable>
       <View style={styles.content}>
-          <View style={styles.logoSection}>
-            <Image source={LOGO} style={styles.logo} contentFit="contain" />
-            
-          </View>
-          <Text style={styles.appName}>Pliz</Text>    
-          <Text style={styles.title}>Create your account</Text>
-          <Text style={styles.subtitle}>Start your journey with Pliz</Text>
-
-          <View style={styles.form}>
-            <Controller
-              control={control}
-              name="email"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <FormTextInput
-                  label="Email Address"
-                  leftIcon="person-outline"
-                  placeholder="you@example.com"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  error={errors.email?.message}
-                  accessibilityLabel="Email address"
-                />
-              )}
-            />
-
-            <Controller
-              control={control}
-              name="password"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <FormTextInput
-                  label="Create Password"
-                  leftIcon="lock-closed-outline"
-                  placeholder="Enter your password"
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  secureTextEntry={!passwordVisible}
-                  onToggleSecure={() => setPasswordVisible((v) => !v)}
-                  hint="Use a mix of Letters, Numbers and Symbols"
-                  error={errors.password?.message}
-                  accessibilityLabel="Create password"
-                />
-              )}
-            />
-
-            <CTAButton
-              label="Sign up"
-              onPress={handleSubmit(onSignUp)}
-              variant="gradient"
-              accessibilityLabel="Sign up"
-            />
-          </View>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>Or continue with</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <View style={styles.socialColumn}>
-            <SocialButton provider="apple" onPress={onApple} />
-            <SocialButton provider="google" onPress={onGoogle} />
-          </View>
-
-          <View style={styles.signInRow}>
-            <Text style={styles.signInPrompt}>Already have an Account? </Text>
-            <Pressable onPress={onSignIn} accessibilityLabel="Sign in" accessibilityRole="link">
-              <Text style={styles.signInLink}>Sign in</Text>
-            </Pressable>
-          </View>
+        <View style={styles.logoSection}>
+          <Image source={LOGO} style={styles.logo} contentFit="contain" />
         </View>
+        <Text style={styles.appName}>Pliz</Text>
+        <Text style={styles.title}>Create your account</Text>
+        <Text style={styles.subtitle}>Start your journey with Pliz</Text>
+
+        {apiMessage ? (
+          <Text style={styles.apiError} accessibilityLiveRegion="polite">
+            {apiMessage}
+          </Text>
+        ) : null}
+
+        <View style={styles.form}>
+          <Controller
+            control={control}
+            name="username"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextInput
+                label="Username"
+                leftIcon="at-outline"
+                placeholder="johndoe"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={errors.username?.message}
+                accessibilityLabel="Username"
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="email"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextInput
+                label="Email Address"
+                leftIcon="person-outline"
+                placeholder="you@example.com"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={errors.email?.message}
+                accessibilityLabel="Email address"
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="password"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextInput
+                label="Create Password"
+                leftIcon="lock-closed-outline"
+                placeholder="Enter your password"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                secureTextEntry={!passwordVisible}
+                onToggleSecure={() => setPasswordVisible((v) => !v)}
+                hint="8+ chars, upper & lower case, number, special (@$!%*?&#)"
+                error={errors.password?.message}
+                accessibilityLabel="Create password"
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="confirmPassword"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextInput
+                label="Confirm Password"
+                leftIcon="lock-closed-outline"
+                placeholder="Re-enter your password"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                secureTextEntry={!confirmVisible}
+                onToggleSecure={() => setConfirmVisible((v) => !v)}
+                error={errors.confirmPassword?.message}
+                accessibilityLabel="Confirm password"
+              />
+            )}
+          />
+
+          <CTAButton
+            label={isSubmitting ? 'Creating account…' : 'Sign up'}
+            onPress={handleSubmit(onSignUp)}
+            variant="gradient"
+            disabled={isSubmitting}
+            accessibilityLabel="Sign up"
+          />
+          {isSubmitting ? (
+            <ActivityIndicator
+              style={styles.spinner}
+              color={COLORS.brandBlue}
+              accessibilityLabel="Loading"
+            />
+          ) : null}
+        </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>Or continue with</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <View style={styles.socialColumn}>
+          <SocialButton provider="apple" onPress={onApple} />
+          <SocialButton provider="google" onPress={onGoogle} />
+        </View>
+
+        <View style={styles.signInRow}>
+          <Text style={styles.signInPrompt}>Already have an Account? </Text>
+          <Pressable onPress={onSignIn} accessibilityLabel="Sign in" accessibilityRole="link">
+            <Text style={styles.signInLink}>Sign in</Text>
+          </Pressable>
+        </View>
+      </View>
     </Screen>
   );
 }
@@ -183,9 +303,19 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     alignSelf: 'stretch',
   },
+  apiError: {
+    alignSelf: 'stretch',
+    fontSize: 14,
+    color: COLORS.error,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   form: {
     width: '100%',
     marginBottom: 8,
+  },
+  spinner: {
+    marginTop: 12,
   },
   divider: {
     flexDirection: 'row',

@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 import { z } from 'zod';
@@ -13,6 +13,9 @@ import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
 import { Screen } from '@/components/Screen';
 import { SocialButton } from '@/components/SocialButton';
+import { login as loginRequest } from '@/lib/api/auth';
+import { PlizApiError } from '@/lib/api/types';
+import { setTokens } from '@/lib/auth/access-token';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
@@ -29,25 +32,62 @@ const COLORS = {
   heading: '#1F2937',
   body: '#6B7280',
   link: '#2E8BEA',
+  error: '#DC2626',
 } as const;
 
 export default function LoginScreen() {
+  const { registered } = useLocalSearchParams<{ registered?: string }>();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiMessage, setApiMessage] = useState<string | null>(null);
 
   const {
     control,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
 
-  const onSignIn = (data: LoginFormData) => {
-    // Stub: replace with real auth later
-    console.log('Sign in', data, { rememberMe });
-    router.replace('/(tabs)' as import('expo-router').Href);
+  const onSignIn = async (data: LoginFormData) => {
+    setApiMessage(null);
+    setIsSubmitting(true);
+    try {
+      const result = await loginRequest({
+        email: data.email,
+        password: data.password,
+      });
+      await setTokens(result.accessToken, result.refreshToken);
+
+      if (!result.user.isProfileComplete) {
+        router.replace('/(auth)/signup-profile' as import('expo-router').Href);
+      } else {
+        router.replace('/(tabs)' as import('expo-router').Href);
+      }
+    } catch (e) {
+      if (e instanceof PlizApiError) {
+        if (e.errors.length) {
+          for (const item of e.errors) {
+            if (item.field === 'email') {
+              setError('email', { type: 'server', message: item.message });
+            }
+            if (item.field === 'password') {
+              setError('password', { type: 'server', message: item.message });
+            }
+          }
+        }
+        if (e.errors.length === 0 || !e.errors.some((x) => x.field === 'email' || x.field === 'password')) {
+          setApiMessage(e.message);
+        }
+      } else {
+        setApiMessage('Something went wrong. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const onForgotPassword = () => {
@@ -79,6 +119,18 @@ export default function LoginScreen() {
           <Text style={styles.welcomeSubtitle}>
             Sign in to continue helping or receiving help
           </Text>
+
+          {registered === '1' ? (
+            <Text style={styles.successBanner}>
+              Account created. Check your email to verify, then sign in to complete your profile.
+            </Text>
+          ) : null}
+
+          {apiMessage ? (
+            <Text style={styles.apiError} accessibilityLiveRegion="polite">
+              {apiMessage}
+            </Text>
+          ) : null}
 
           <View style={styles.form}>
             <Controller
@@ -145,11 +197,15 @@ export default function LoginScreen() {
             </View>
 
             <CTAButton
-              label="Sign In"
+              label={isSubmitting ? 'Signing in…' : 'Sign In'}
               onPress={handleSubmit(onSignIn)}
               variant="gradient"
+              disabled={isSubmitting}
               accessibilityLabel="Sign in"
             />
+            {isSubmitting ? (
+              <ActivityIndicator color={COLORS.brandBlue} style={styles.spinner} />
+            ) : null}
           </View>
 
           <View style={styles.divider}>
@@ -211,6 +267,26 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     textAlign: 'left',
     alignSelf: 'stretch',
+  },
+  successBanner: {
+    alignSelf: 'stretch',
+    fontSize: 14,
+    color: '#166534',
+    backgroundColor: '#DCFCE7',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  apiError: {
+    alignSelf: 'stretch',
+    fontSize: 14,
+    color: COLORS.error,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  spinner: {
+    marginTop: 12,
   },
   form: {
     width: '100%',
