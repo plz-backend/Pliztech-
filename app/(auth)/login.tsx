@@ -13,6 +13,7 @@ import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
 import { Screen } from '@/components/Screen';
 import { SocialButton } from '@/components/SocialButton';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { login as loginRequest } from '@/lib/api/auth';
 import { PlizApiError } from '@/lib/api/types';
 import { setTokens } from '@/lib/auth/access-token';
@@ -36,6 +37,7 @@ const COLORS = {
 } as const;
 
 export default function LoginScreen() {
+  const { refreshUser } = useCurrentUser();
   const { registered } = useLocalSearchParams<{ registered?: string }>();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -61,6 +63,7 @@ export default function LoginScreen() {
         password: data.password,
       });
       await setTokens(result.accessToken, result.refreshToken);
+      await refreshUser();
 
       if (!result.user.isProfileComplete) {
         router.replace('/(auth)/signup-profile' as import('expo-router').Href);

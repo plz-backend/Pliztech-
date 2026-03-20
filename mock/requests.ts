@@ -1,5 +1,5 @@
 import { MOCK_BROWSE_REQUESTS, MOCK_TRENDING_REQUESTS } from './home';
-import type { BrowseRequest } from './home';
+import type { BrowseRequest, TrendingRequest } from './home';
 
 export interface RequestDetail extends BrowseRequest {
   fullDescription: string;
@@ -13,7 +13,7 @@ export interface RequestDetail extends BrowseRequest {
 }
 
 /** Convert trending request shape to browse-like base for RequestDetail */
-function trendingToBase(t: (typeof MOCK_TRENDING_REQUESTS)[number]) {
+function trendingToBase(t: TrendingRequest) {
   return {
     id: t.id,
     name: t.name,

@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
 import { Screen } from '@/components/Screen';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { completeProfile } from '@/lib/api/profile';
 import { PlizApiError } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
@@ -61,6 +62,7 @@ const COLORS = {
 } as const;
 
 export default function SignupProfileScreen() {
+  const { refreshUser } = useCurrentUser();
   const [consentChecked, setConsentChecked] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
@@ -136,6 +138,7 @@ export default function SignupProfileScreen() {
         agreeToTerms: true,
         isAnonymous: false,
       });
+      await refreshUser();
       router.replace('/(tabs)' as import('expo-router').Href);
     } catch (e) {
       if (e instanceof PlizApiError) {

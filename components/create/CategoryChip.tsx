@@ -25,7 +25,7 @@ export function CategoryChip({ label, icon, selected, onPress }: CategoryChipPro
     >
       <Ionicons
         name={icon}
-        size={18}
+        size={15}
         color={selected ? BRAND_BLUE : BODY}
         style={styles.icon}
       />
@@ -40,14 +40,14 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
-    marginBottom: 8,
-    marginRight: 8,
+    marginBottom: 6,
+    marginRight: 6,
     minWidth: '47%',
   },
   chipSelected: {
@@ -55,10 +55,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFF6FF',
   },
   icon: {
-    marginRight: 8,
+    marginRight: 6,
   },
   label: {
-    fontSize: 13,
+    fontSize: 11,
+    lineHeight: 14,
     color: HEADING,
     flex: 1,
   },

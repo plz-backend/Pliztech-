@@ -1,6 +1,12 @@
 import type { ComponentProps } from 'react';
 import { useState } from 'react';
-import { Platform, StyleSheet, TextInput, View } from 'react-native';
+import {
+  type StyleProp,
+  type ViewStyle,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Text } from '@/components/Text';
 
@@ -13,19 +19,31 @@ const BODY_COLOR = '#6B7280';
 const INPUT_TEXT_COLOR = '#111827';
 
 export interface FormTextAreaProps
-  extends Omit<ComponentProps<typeof TextInput>, 'style'> {
+  extends Omit<ComponentProps<typeof TextInput>, 'style' | 'multiline'> {
   label: string;
   error?: string;
   hint?: string;
+  /** Show current/max in the label row (e.g. words or characters). */
   wordCount?: { current: number; max: number };
-  containerStyle?: ComponentProps<View>['style'];
+  /** How to label the count in the label row. Default `words`. */
+  countUnit?: 'words' | 'characters';
+  /** `multiline` (default): tall box like a description. `single`: one-line field with same border/label styling. */
+  variant?: 'multiline' | 'single';
+  /** With `variant="single"`, prefix inside the field (e.g. `₦`). Ignored for multiline. */
+  prefix?: string;
+  containerStyle?: StyleProp<ViewStyle>;
 }
+
+const SINGLE_LINE_MIN_HEIGHT = 52;
 
 export function FormTextArea({
   label,
   error,
   hint,
   wordCount,
+  countUnit = 'words',
+  variant = 'multiline',
+  prefix,
   containerStyle,
   accessibilityLabel = label,
   ...inputProps
@@ -37,33 +55,63 @@ export function FormTextArea({
       ? HOVER_FOCUS_BORDER_COLOR
       : BORDER_COLOR;
 
+  const isSingle = variant === 'single';
+  const showPrefix = isSingle && prefix != null && prefix !== '';
+  const countSuffix = countUnit === 'characters' ? 'characters' : 'words';
+
+  const focusProps = {
+    onFocus: (e: Parameters<NonNullable<typeof inputProps.onFocus>>[0]) => {
+      setIsFocused(true);
+      inputProps.onFocus?.(e);
+    },
+    onBlur: (e: Parameters<NonNullable<typeof inputProps.onBlur>>[0]) => {
+      setIsFocused(false);
+      inputProps.onBlur?.(e);
+    },
+  };
+
   return (
     <View style={[styles.container, containerStyle]}>
       <View style={styles.labelRow}>
         <Text style={styles.label}>{label}</Text>
         {wordCount != null && (
           <Text style={styles.wordCount}>
-            {wordCount.current}/{wordCount.max} words
+            {wordCount.current}/{wordCount.max} {countSuffix}
           </Text>
         )}
       </View>
-      <TextInput
-        style={[styles.input, { borderColor }, error ? styles.inputError : undefined]}
-        placeholderTextColor={BODY_COLOR}
-        multiline
-        textAlignVertical="top"
-        accessibilityLabel={accessibilityLabel}
-        showSoftInputOnFocus={true}
-        {...inputProps}
-        onFocus={(e) => {
-          setIsFocused(true);
-          inputProps.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setIsFocused(false);
-          inputProps.onBlur?.(e);
-        }}
-      />
+      {showPrefix ? (
+        <View style={[styles.inputShell, { borderColor }]}>
+          <Text style={styles.prefix}>{prefix}</Text>
+          <TextInput
+            style={[styles.inputInline, styles.inputSingle]}
+            placeholderTextColor={BODY_COLOR}
+            multiline={false}
+            accessibilityLabel={accessibilityLabel}
+            showSoftInputOnFocus={true}
+            {...inputProps}
+            {...focusProps}
+          />
+        </View>
+      ) : (
+        <TextInput
+          style={[
+            styles.input,
+            isSingle && styles.inputSingle,
+            { borderColor },
+            error ? styles.inputError : undefined,
+          ]}
+          placeholderTextColor={BODY_COLOR}
+          multiline={!isSingle}
+          {...(isSingle
+            ? {}
+            : { textAlignVertical: 'top' as const })}
+          accessibilityLabel={accessibilityLabel}
+          showSoftInputOnFocus={true}
+          {...inputProps}
+          {...focusProps}
+        />
+      )}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {hint && !error ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
@@ -98,6 +146,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: INPUT_TEXT_COLOR,
     minHeight: 100,
+  },
+  inputSingle: {
+    minHeight: SINGLE_LINE_MIN_HEIGHT,
+  },
+  inputShell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS,
+    minHeight: SINGLE_LINE_MIN_HEIGHT,
+    backgroundColor: '#FFFFFF',
+  },
+  prefix: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: LABEL_COLOR,
+    paddingLeft: 16,
+    marginRight: 6,
+  },
+  inputInline: {
+    flex: 1,
+    fontSize: 16,
+    color: INPUT_TEXT_COLOR,
+    paddingVertical: 14,
+    paddingRight: 16,
+    paddingLeft: 0,
   },
   inputError: {
     borderColor: ERROR_COLOR,

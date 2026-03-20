@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
@@ -9,10 +9,43 @@ import { ProfileRow } from '@/components/profile/ProfileRow';
 import { ProfileSection } from '@/components/profile/ProfileSection';
 import { ProfileSummaryCard } from '@/components/profile/ProfileSummaryCard';
 import { Screen } from '@/components/Screen';
-
+import {
+  avatarColorFromSeed,
+  CURRENT_USER_FOCUS_REFETCH_STALE_MS,
+  displayFullName,
+  displayRoleLabel,
+  initialsFromDisplayName,
+  useCurrentUser,
+} from '@/contexts/CurrentUserContext';
 export default function ProfileScreen() {
+  const { user, isLoading, refreshUser } = useCurrentUser();
+  const lastRefreshRef = useRef<number>(0);
+
   const [pushNotifications, setPushNotifications] = useState(true);
   const [anonymousMode, setAnonymousMode] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      if (now - lastRefreshRef.current < CURRENT_USER_FOCUS_REFETCH_STALE_MS) {
+        return;
+      }
+      lastRefreshRef.current = now;
+      void refreshUser();
+    }, [refreshUser])
+  );
+
+  useEffect(() => {
+    setAnonymousMode(user?.profile?.isAnonymous ?? false);
+  }, [user?.profile?.isAnonymous]);
+
+  const fullName = displayFullName(user);
+  const email = user?.email ?? '';
+  const roleLabel = user ? displayRoleLabel(user.role) : 'Member';
+  const seed = user?.username ?? user?.email ?? '';
+  const avatarColor = seed ? avatarColorFromSeed(seed) : '#2E8BEA';
+  const initials = fullName ? initialsFromDisplayName(fullName) : '?';
+  const showCardLoading = isLoading && !user;
 
   return (
     <Screen backgroundColor="#F9FAFB" scrollable>
@@ -40,7 +73,18 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.content}>
-        <ProfileSummaryCard />
+        <ProfileSummaryCard
+          fullName={fullName}
+          email={email}
+          verified={user?.isEmailVerified ?? false}
+          roleLabel={roleLabel}
+          avatarColor={avatarColor}
+          initials={initials}
+          given={0}
+          helped={0}
+          requests={0}
+          isLoading={showCardLoading}
+        />
 
         <ProfileSection title="User info">
           <ProfileRow
@@ -108,7 +152,7 @@ export default function ProfileScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.logoutButton, pressed && styles.pressed]}
-          onPress={() => router.replace('/(public)/welcome' as import('expo-router').Href)}
+          onPress={() => router.push('/(tabs)/logout' as import('expo-router').Href)}
           accessibilityRole="button"
           accessibilityLabel="Log out"
         >

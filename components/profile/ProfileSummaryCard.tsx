@@ -1,42 +1,70 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
-
-import { MOCK_PROFILE } from '@/mock/profile';
 
 function formatNaira(amount: number) {
   return `₦${amount.toLocaleString()}`;
 }
 
-export function ProfileSummaryCard() {
-  const { fullName, email, verified, role, avatarColor, given, helped, requests } =
-    MOCK_PROFILE;
+export type ProfileSummaryCardProps = {
+  fullName: string;
+  email: string;
+  verified: boolean;
+  roleLabel: string;
+  avatarColor: string;
+  initials: string;
+  /** Placeholder until donor/stats API exists */
+  given?: number;
+  helped?: number;
+  requests?: number;
+  isLoading?: boolean;
+};
 
-  const initial = fullName.split(' ').map((n) => n[0]).join('').slice(0, 2);
-
+export function ProfileSummaryCard({
+  fullName,
+  email,
+  verified,
+  roleLabel,
+  avatarColor,
+  initials,
+  given = 0,
+  helped = 0,
+  requests = 0,
+  isLoading = false,
+}: ProfileSummaryCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
         <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-          <Text style={styles.avatarText}>{initial}</Text>
+          {isLoading && !fullName ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.avatarText}>{initials}</Text>
+          )}
         </View>
         <View style={styles.info}>
           <View style={styles.nameRow}>
-            <Text style={styles.name}>{fullName}</Text>
-            <View style={styles.onlineDot} />
+            <Text style={styles.name} numberOfLines={2}>
+              {isLoading && !fullName ? 'Loading…' : fullName}
+            </Text>
+            {!isLoading && fullName ? <View style={styles.onlineDot} /> : null}
             <View style={styles.roleBadge}>
               <Ionicons name="heart" size={12} color="#FFFFFF" />
-              <Text style={styles.roleText}>{role}</Text>
+              <Text style={styles.roleText}>{roleLabel}</Text>
             </View>
           </View>
-          <Text style={styles.email}>{email}</Text>
-          {verified && (
+          <Text style={styles.email} numberOfLines={1}>
+            {isLoading && !email ? '…' : email}
+          </Text>
+          {verified ? (
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark" size={12} color="#FFFFFF" />
               <Text style={styles.verifiedText}>Verified</Text>
             </View>
-          )}
+          ) : !isLoading && email ? (
+            <Text style={styles.unverifiedHint}>Email not verified</Text>
+          ) : null}
         </View>
       </View>
       <View style={styles.statsRow}>
@@ -103,6 +131,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
+    flexShrink: 1,
   },
   onlineDot: {
     width: 8,
@@ -128,6 +157,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 8,
+  },
+  unverifiedHint: {
+    fontSize: 12,
+    color: '#D97706',
+    fontWeight: '500',
   },
   verifiedBadge: {
     flexDirection: 'row',

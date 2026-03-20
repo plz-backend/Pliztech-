@@ -5,10 +5,10 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
+  Alert,
   Pressable,
   StyleSheet,
   Switch,
-  TextInput,
   View,
 } from 'react-native';
 
@@ -17,21 +17,36 @@ import { z } from 'zod';
 
 import { CategoryChip } from '@/components/create/CategoryChip';
 import { RequestLimitAlert } from '@/components/create/RequestLimitAlert';
+import { CTAButton } from '@/components/CTAButton';
 import { FormTextArea } from '@/components/FormTextArea';
-import { PrimaryButton } from '@/components/PrimaryButton';
 import { Screen } from '@/components/Screen';
 import { REQUEST_CATEGORIES } from '@/constants/categories';
+import {
+  clampBegDescriptionForApi,
+  createBeg,
+  normalizeBegTitleForApi,
+  uiCategoryToApiCategory,
+} from '@/lib/api/beg';
+import { PlizApiError } from '@/lib/api/types';
+import { getAccessToken } from '@/lib/auth/access-token';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
+const BEG_TITLE_MAX = 25;
+
 const createRequestSchema = z.object({
   categoryId: z.string().min(1, 'Please select a category'),
+  title: z
+    .string()
+    .min(1, 'Add a short title for your request')
+    .max(BEG_TITLE_MAX, `Title must be ${BEG_TITLE_MAX} characters or less`)
+    .refine((val) => val.trim().length > 0, 'Add a short title for your request'),
   description: z
     .string()
     .min(1, 'Please describe your need')
     .refine(
-      (val) => val.trim().split(/\s+/).filter(Boolean).length <= 40,
-      'Maximum 40 words'
+      (val) => val.trim().split(/\s+/).filter(Boolean).length <= 30,
+      'Maximum 30 words (server limit)'
     ),
   amount: z
     .string()
@@ -39,15 +54,24 @@ const createRequestSchema = z.object({
     .refine(
       (val) => {
         const num = Number(val.replace(/,/g, ''));
-        return !isNaN(num) && num >= 0;
+        return !isNaN(num) && num >= 100;
       },
-      'Enter a valid amount'
+      'Minimum amount is ₦100'
     ),
   expiryHours: z.enum(['24', '48', '72']),
   showName: z.boolean(),
 });
 
 type CreateRequestFormData = z.infer<typeof createRequestSchema>;
+
+const DEFAULT_CREATE_VALUES: CreateRequestFormData = {
+  categoryId: '',
+  title: '',
+  description: '',
+  amount: '',
+  expiryHours: '24',
+  showName: true,
+};
 
 const COLORS = {
   background: '#FFFFFF',
@@ -68,30 +92,75 @@ function countWords(text: string): number {
 
 export default function CreateScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     control,
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm<CreateRequestFormData>({
     resolver: zodResolver(createRequestSchema),
-    defaultValues: {
-      categoryId: '',
-      description: '',
-      amount: '0',
-      expiryHours: '24',
-      showName: true,
-    },
+    defaultValues: DEFAULT_CREATE_VALUES,
   });
 
   const description = watch('description');
+  const titleValue = watch('title');
   const wordCount = countWords(description ?? '');
+  const titleCharCount = (titleValue ?? '').length;
 
-  const onContinue = (data: CreateRequestFormData) => {
-    console.log('Create request', data);
-    router.back();
+  const onContinue = async (data: CreateRequestFormData) => {
+    if (isSubmitting) return;
+
+    const token = await getAccessToken();
+    if (!token) {
+      Alert.alert('Sign in required', 'Please log in to submit a request.', [
+        { text: 'OK', onPress: () => router.push('/(auth)/login' as import('expo-router').Href) },
+      ]);
+      return;
+    }
+
+    const amountRequested = Number(data.amount.replace(/,/g, ''));
+    const descriptionForApi = clampBegDescriptionForApi(data.description);
+    const title = normalizeBegTitleForApi(data.title);
+    if (!title) {
+      Alert.alert('Title required', 'Please enter a short title for your request.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { message } = await createBeg(token, {
+        title,
+        description: descriptionForApi,
+        category: uiCategoryToApiCategory(data.categoryId),
+        amountRequested,
+        mediaType: 'text',
+      });
+
+      Alert.alert('Request submitted', message, [
+        {
+          text: 'OK',
+          onPress: () => {
+            reset(DEFAULT_CREATE_VALUES);
+            setSelectedCategory(null);
+            router.back();
+          },
+        },
+      ]);
+    } catch (e) {
+      const msg =
+        e instanceof PlizApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Something went wrong';
+      Alert.alert('Could not submit', msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const onBack = () => {
@@ -144,6 +213,27 @@ export default function CreateScreen() {
 
           <Controller
             control={control}
+            name="title"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextArea
+                variant="single"
+                label="Short title"
+                placeholder="e.g. Transport to new job"
+                value={value}
+                onChangeText={(t) => onChange(t.slice(0, BEG_TITLE_MAX))}
+                onBlur={onBlur}
+                maxLength={BEG_TITLE_MAX}
+                error={errors.title?.message}
+                hint="Shown on the feed (max 25 characters)."
+                wordCount={{ current: titleCharCount, max: BEG_TITLE_MAX }}
+                countUnit="characters"
+                autoCapitalize="sentences"
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
             name="description"
             render={({ field: { onChange, onBlur, value } }) => (
               <FormTextArea
@@ -152,7 +242,7 @@ export default function CreateScreen() {
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                wordCount={{ current: wordCount, max: 40 }}
+                wordCount={{ current: wordCount, max: 30 }}
                 error={errors.description?.message}
                 hint="No editing after submission. No images or attachments allowed."
                 maxLength={300}
@@ -164,24 +254,18 @@ export default function CreateScreen() {
             control={control}
             name="amount"
             render={({ field: { onChange, onBlur, value } }) => (
-              <View style={styles.amountWrap}>
-                <Text style={styles.amountLabel}>How much do you need?</Text>
-                <View style={styles.amountInputRow}>
-                  <Text style={styles.amountPrefix}>₦</Text>
-                  <TextInput
-                    style={styles.amountInput}
-                    placeholder="0"
-                    placeholderTextColor="#6B7280"
-                    value={value}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    keyboardType="numeric"
-                  />
-                </View>
-                {errors.amount?.message ? (
-                  <Text style={styles.amountError}>{errors.amount.message}</Text>
-                ) : null}
-              </View>
+              <FormTextArea
+                variant="single"
+                prefix="₦"
+                label="How much do you need?"
+                placeholder="0"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                keyboardType="numeric"
+                error={errors.amount?.message}
+                hint="Minimum ₦100. Subject to your trust tier limit."
+              />
             )}
           />
 
@@ -245,12 +329,12 @@ export default function CreateScreen() {
             />
           </View>
 
-          <PrimaryButton
-            label="Continue"
+          <CTAButton
+            label={isSubmitting ? 'Submitting…' : 'Continue'}
             onPress={handleSubmit(onContinue)}
             variant="gradient"
-            rightIcon="send"
             accessibilityLabel="Continue"
+            disabled={isSubmitting}
           />
 
           <Text style={styles.disclaimer}>
@@ -399,40 +483,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     lineHeight: 18,
-  },
-  amountWrap: {
-    marginBottom: 16,
-  },
-  amountLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.heading,
-    marginBottom: 8,
-  },
-  amountInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    borderRadius: 15,
-    paddingHorizontal: 16,
-    minHeight: 56,
-  },
-  amountPrefix: {
-    fontSize: 16,
-    color: COLORS.heading,
-    marginRight: 8,
-  },
-  amountInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#111827',
-    paddingVertical: 14,
-    paddingHorizontal: 0,
-  },
-  amountError: {
-    fontSize: 12,
-    color: '#DC2626',
-    marginTop: 6,
   },
 });

@@ -3,6 +3,7 @@ import { apiUrl } from '@/constants/api';
 import {
   type LoginRequestBody,
   type LoginSuccessData,
+  type MeUser,
   type SignupRequestBody,
   type SignupSuccessResponse,
   PlizApiError,
@@ -90,4 +91,43 @@ export async function login(body: LoginRequestBody): Promise<LoginSuccessData> {
   }
 
   return data.data;
+}
+
+/**
+ * GET /api/auth/me — current user + profile (Bearer required).
+ */
+export async function getMe(accessToken: string): Promise<MeUser> {
+  const res = await fetch(apiUrl('/api/auth/me'), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    data?: { user: MeUser };
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(
+      data.message ?? `Request failed (${res.status})`,
+      res.status
+    );
+  }
+
+  if (!data.data?.user) {
+    throw new PlizApiError('Unexpected response shape', res.status);
+  }
+
+  return data.data.user;
 }

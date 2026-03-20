@@ -76,6 +76,25 @@ export type CompletedProfile = {
   isAnonymous: boolean;
 };
 
+/** PUT /api/auth/profile */
+export type UpdateProfileBody = {
+  firstName?: string;
+  middleName?: string | null;
+  lastName?: string;
+  phoneNumber?: string;
+  displayName?: string | null;
+  isAnonymous?: boolean;
+};
+
+export type UpdatedProfilePayload = {
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  phoneNumber: string;
+  displayName: string | null;
+  isAnonymous: boolean;
+};
+
 export type LoginRequestBody = {
   email: string;
   password: string;
@@ -87,4 +106,23 @@ export type LoginSuccessData = {
   user: LoginUser;
   accessToken: string;
   refreshToken: string;
+};
+
+/** Nested profile on User (GET /api/auth/me) — matches Prisma UserProfile JSON */
+export type MeUserProfile = {
+  userId: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  phoneNumber: string;
+  displayName: string | null;
+  isAnonymous: boolean;
+  agreeToTerms: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** GET /api/auth/me — user includes profile when completed */
+export type MeUser = SignupUser & {
+  profile: MeUserProfile | null;
 };

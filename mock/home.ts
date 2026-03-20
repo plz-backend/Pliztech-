@@ -14,6 +14,21 @@ export const MOCK_IMPACT = {
   weeklyHelped: 3,
 } as const;
 
+/** Home dashboard trending row (API-mapped or mock). */
+export type TrendingRequest = {
+  id: string;
+  name: string;
+  initial: string;
+  avatarColor: string;
+  timeAgo: string;
+  text: string;
+  raised: number;
+  goal: number;
+  percent: number;
+  /** ISO date for client-side sort (API). */
+  createdAt?: string;
+};
+
 export const MOCK_TRENDING_REQUESTS = [
   {
     id: '1',
@@ -48,9 +63,7 @@ export const MOCK_TRENDING_REQUESTS = [
     goal: 25000,
     percent: 48,
   },
-] as const;
-
-export type TrendingRequest = (typeof MOCK_TRENDING_REQUESTS)[number];
+] as const satisfies readonly TrendingRequest[];
 
 export const MOCK_RECENT_CONTRIBUTIONS = [
   {
@@ -70,6 +83,25 @@ export const MOCK_RECENT_CONTRIBUTIONS = [
 ] as const;
 
 export type RecentContribution = (typeof MOCK_RECENT_CONTRIBUTIONS)[number];
+
+/** Browse feed card shape (API-mapped or mock). */
+export type BrowseRequest = {
+  id: string;
+  name: string;
+  initial: string;
+  avatarColor: string;
+  timeLeft: string;
+  categoryId: string;
+  categoryLabel: string;
+  badge?: string;
+  text: string;
+  raised: number;
+  goal: number;
+  percent: number;
+  /** ISO timestamps when mapped from API (for client-side sort). */
+  createdAt?: string;
+  expiresAt?: string;
+};
 
 export const MOCK_BROWSE_REQUESTS = [
   {
@@ -128,6 +160,4 @@ export const MOCK_BROWSE_REQUESTS = [
     goal: 50000,
     percent: 28,
   },
-] as const;
-
-export type BrowseRequest = (typeof MOCK_BROWSE_REQUESTS)[number];
+] as const satisfies readonly BrowseRequest[];

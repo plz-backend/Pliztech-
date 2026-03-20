@@ -1,43 +1,45 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
-export function RequestDetailHeader() {
+export type RequestDetailHeaderProps = {
+  /** Report / flag this request (Figma: top-right flag). */
+  onReportPress?: () => void;
+};
+
+export function RequestDetailHeader({ onReportPress }: RequestDetailHeaderProps) {
+  const handleReport = () => {
+    if (onReportPress) {
+      onReportPress();
+      return;
+    }
+    Alert.alert('Report request', 'Thanks for looking out for the community. Reporting will be available soon.');
+  };
+
   return (
     <View style={styles.header}>
       <Pressable
         onPress={() => router.back()}
-        style={styles.headerButton}
+        style={styles.backCircle}
         accessibilityLabel="Go back"
         accessibilityRole="button"
       >
-        <Ionicons name="arrow-back" size={24} color="#1F2937" />
+        <Ionicons name="arrow-back" size={22} color="#1F2937" />
       </Pressable>
       <View style={styles.logoWrap}>
         <Image source={LOGO} style={styles.logo} contentFit="contain" />
       </View>
-      <View style={styles.rightButtons}>
-        <Pressable
-          style={styles.headerButton}
-          onPress={() => router.push('/(tabs)/notifications')}
-          accessibilityLabel="Notifications"
-          accessibilityRole="button"
-        >
-          <View>
-            <Ionicons name="notifications-outline" size={24} color="#1F2937" />
-          </View>
-        </Pressable>
-        <Pressable
-          style={styles.headerButton}
-          accessibilityLabel="Bookmark"
-          accessibilityRole="button"
-        >
-          <Ionicons name="bookmark-outline" size={24} color="#1F2937" />
-        </Pressable>
-      </View>
+      <Pressable
+        style={styles.iconCircle}
+        onPress={handleReport}
+        accessibilityLabel="Report or flag this request"
+        accessibilityRole="button"
+      >
+        <Ionicons name="flag-outline" size={20} color="#1F2937" />
+      </Pressable>
     </View>
   );
 }
@@ -49,9 +51,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 20,
   },
-  headerButton: {
+  backCircle: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -65,9 +77,5 @@ const styles = StyleSheet.create({
   logo: {
     width: 40,
     height: 40,
-  },
-  rightButtons: {
-    flexDirection: 'row',
-    marginLeft: 'auto',
   },
 });

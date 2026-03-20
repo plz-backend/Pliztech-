@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/Text';
 
@@ -6,13 +6,15 @@ export interface AmountChipProps {
   label: string;
   selected: boolean;
   onPress: () => void;
+  /** Merged onto the chip (e.g. `{ flex: 1 }` for a single row). */
+  style?: StyleProp<ViewStyle>;
 }
 
-export function AmountChip({ label, selected, onPress }: AmountChipProps) {
+export function AmountChip({ label, selected, onPress, style }: AmountChipProps) {
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.chip, selected && styles.chipSelected]}
+      style={[styles.chip, selected && styles.chipSelected, style]}
       accessibilityRole="button"
       accessibilityState={{ selected }}
     >
@@ -23,8 +25,9 @@ export function AmountChip({ label, selected, onPress }: AmountChipProps) {
 
 const styles = StyleSheet.create({
   chip: {
-    flex: 1,
-    paddingVertical: 12,
+    width: '100%',
+    paddingVertical: 14,
+    minHeight: 48,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5E7EB',

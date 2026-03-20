@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,16 +8,71 @@ import { ImpactCard } from '@/components/home/ImpactCard';
 import { QuickActions } from '@/components/home/QuickActions';
 import { RecentContributions } from '@/components/home/RecentContributions';
 import { TrendingRequests } from '@/components/home/TrendingRequests';
-
 import {
-  MOCK_IMPACT,
-  MOCK_RECENT_CONTRIBUTIONS,
-  MOCK_TRENDING_REQUESTS,
-  MOCK_USER,
-} from '@/mock/home';
+  CURRENT_USER_FOCUS_REFETCH_STALE_MS,
+  displayFirstName,
+  displayRoleLabel,
+  useCurrentUser,
+} from '@/contexts/CurrentUserContext';
+
+import { getTrendingBegs } from '@/lib/api/beg';
+import { PlizApiError } from '@/lib/api/types';
+import { MOCK_IMPACT, MOCK_RECENT_CONTRIBUTIONS } from '@/mock/home';
+import type { TrendingRequest } from '@/mock/home';
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { user, isLoading, refreshUser } = useCurrentUser();
+  const lastHomeRefreshRef = useRef<number>(0);
+  const [trending, setTrending] = useState<TrendingRequest[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [trendingError, setTrendingError] = useState<string | null>(null);
+
+  const loadTrending = useCallback(async (opts?: { background?: boolean }) => {
+    const background = opts?.background ?? false;
+    if (!background) {
+      setTrendingLoading(true);
+    }
+    setTrendingError(null);
+    try {
+      const items = await getTrendingBegs(5);
+      setTrending(items);
+    } catch (e) {
+      if (!background) {
+        const msg =
+          e instanceof PlizApiError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : 'Could not load trending requests';
+        setTrendingError(msg);
+        setTrending([]);
+      }
+    } finally {
+      if (!background) {
+        setTrendingLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTrending();
+  }, [loadTrending]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      if (now - lastHomeRefreshRef.current < CURRENT_USER_FOCUS_REFETCH_STALE_MS) {
+        return;
+      }
+      lastHomeRefreshRef.current = now;
+      void refreshUser();
+      void loadTrending({ background: true });
+    }, [refreshUser, loadTrending])
+  );
+
+  const firstName = isLoading && !user ? '…' : displayFirstName(user) || 'Guest';
+  const role = user ? displayRoleLabel(user.role) : isLoading ? '…' : 'Member';
 
   const onAskForHelp = () => {
     router.push('/(tabs)/(main)/create');
@@ -47,8 +103,8 @@ export default function HomeScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <HomeHeader
-          firstName={MOCK_USER.firstName}
-          role={MOCK_USER.role}
+          firstName={firstName}
+          role={role}
           onNotificationPress={onNotifications}
         />
         <ImpactCard
@@ -61,7 +117,10 @@ export default function HomeScreen() {
           onBrowseRequests={onBrowseRequests}
         />
         <TrendingRequests
-          requests={MOCK_TRENDING_REQUESTS}
+          requests={trending}
+          loading={trendingLoading}
+          errorMessage={trendingError}
+          onRetry={() => void loadTrending()}
           onSeeAll={onSeeAll}
         />
         <RecentContributions

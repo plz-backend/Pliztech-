@@ -1,17 +1,27 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useRef } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
 import { Screen } from '@/components/Screen';
-import { MOCK_PROFILE } from '@/mock/profile';
+import {
+  CURRENT_USER_FOCUS_REFETCH_STALE_MS,
+  displayFullName,
+  useCurrentUser,
+} from '@/contexts/CurrentUserContext';
 
 const BORDER_GRAY = '#E5E7EB';
 const LABEL_GRAY = '#6B7280';
 const VALUE_DARK = '#1F2937';
 const VERIFIED_GREEN = '#22C55E';
 const ICON_BG = '#F3F4F6';
+
+function formatDisplay(value: string | undefined | null, fallback = 'Not set') {
+  const t = value?.trim();
+  return t ? t : fallback;
+}
 
 function InfoRow({
   icon,
@@ -45,9 +55,64 @@ function InfoRow({
 }
 
 export default function PersonalInfoScreen() {
+  const { user, isLoading, error, refreshUser } = useCurrentUser();
+  const lastRefreshRef = useRef<number>(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      if (now - lastRefreshRef.current < CURRENT_USER_FOCUS_REFETCH_STALE_MS) {
+        return;
+      }
+      lastRefreshRef.current = now;
+      void refreshUser();
+    }, [refreshUser])
+  );
+
   const handleEdit = () => {
     router.push('/(tabs)/edit-personal-info');
   };
+
+  if (isLoading && !user) {
+    return (
+      <Screen backgroundColor="#FFFFFF">
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#2E8BEA" />
+          <Text style={styles.loadingText}>Loading your information…</Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Screen backgroundColor="#FFFFFF">
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => router.back()}
+            style={styles.backButton}
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+          >
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </Pressable>
+          <Text style={styles.title}>Personal Information</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error ?? 'Could not load your profile.'}</Text>
+          <Pressable onPress={() => void refreshUser()} style={styles.retryBtn}>
+            <Text style={styles.retryText}>Try again</Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
+
+  const fullName = displayFullName(user);
+  const email = user.email ?? 'Not set';
+  const phone = formatDisplay(user.profile?.phoneNumber);
+  const emailVerified = user.isEmailVerified === true;
 
   return (
     <Screen backgroundColor="#FFFFFF">
@@ -66,30 +131,19 @@ export default function PersonalInfoScreen() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Personal Information</Text>
-        <InfoRow
-          icon="person-outline"
-          label="Full Name"
-          value={MOCK_PROFILE.fullName}
-          isLast={false}
-        />
+        <InfoRow icon="person-outline" label="Full Name" value={fullName} isLast={false} />
         <InfoRow
           icon="mail-outline"
           label="Email"
-          value={MOCK_PROFILE.email}
-          verified={MOCK_PROFILE.verified}
+          value={email}
+          verified={emailVerified}
           isLast={false}
         />
-        <InfoRow
-          icon="call-outline"
-          label="Phone"
-          value={MOCK_PROFILE.phone}
-          verified={MOCK_PROFILE.verified}
-          isLast={false}
-        />
+        <InfoRow icon="call-outline" label="Phone" value={phone} isLast={false} />
         <InfoRow
           icon="location-outline"
           label="Location"
-          value={MOCK_PROFILE.location}
+          value="Not set"
           isLast
         />
       </View>
@@ -190,6 +244,34 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   editText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: VALUE_DARK,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 15,
+    color: LABEL_GRAY,
+  },
+  errorText: {
+    fontSize: 15,
+    color: '#B91C1C',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+  },
+  retryText: {
     fontSize: 16,
     fontWeight: '600',
     color: VALUE_DARK,

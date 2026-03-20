@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,52 +12,159 @@ import {
   View,
 } from 'react-native';
 
+import { CTAButton } from '@/components/CTAButton';
 import { Text } from '@/components/Text';
 
-import { PrimaryButton } from '@/components/PrimaryButton';
 import { ProgressBar } from '@/components/ProgressBar';
 import { AmountChip } from '@/components/request/AmountChip';
 import { RequestDetailHeader } from '@/components/request/RequestDetailHeader';
 import { Screen } from '@/components/Screen';
+import { REQUEST_CATEGORIES } from '@/constants/categories';
+import {
+  begFeedItemToRequestDetail,
+  getBegById,
+} from '@/lib/api/beg';
+import { PlizApiError } from '@/lib/api/types';
+import type { RequestDetail } from '@/mock/requests';
 import {
   getPlatformFee,
-  getRequestDetail,
   getRequestReceives,
 } from '@/mock/requests';
 
 const AMOUNT_OPTIONS = [
-  { value: 1000, label: 'N1K' },
-  { value: 2000, label: 'N2K' },
-  { value: 5000, label: 'N5K' },
-  { value: 10000, label: 'N10K' },
+  { value: 1000, label: '₦1K' },
+  { value: 2000, label: '₦2K' },
+  { value: 5000, label: '₦5K' },
+  { value: 10000, label: '₦10K' },
+];
+
+/** Figma-style emoji reaction pills (counts from API when available). */
+const REACTION_PILLS: {
+  emoji: string;
+  field: 'thumbsUp' | 'hearts' | 'gifts' | 'crowns' | 'messages';
+}[] = [
+  { emoji: '👍', field: 'thumbsUp' },
+  { emoji: '❤️', field: 'hearts' },
+  { emoji: '😂', field: 'gifts' },
+  { emoji: '🥳', field: 'crowns' },
+  { emoji: '😢', field: 'messages' },
 ];
 
 function formatNaira(amount: number) {
   return `₦${amount.toLocaleString()}`;
 }
 
+/** Wide readable column on tablet / web; full width on phones. */
+const REQUEST_DETAIL_MAX_WIDTH = 960;
+
 export default function RequestDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = typeof params.id === 'string' ? params.id : params.id?.[0];
-  const request = useMemo(
-    () => (id ? getRequestDetail(id) : null),
-    [id]
-  );
+
+  const [request, setRequest] = useState<RequestDetail | null>(null);
+  const [loading, setLoading] = useState(Boolean(id));
+  const [error, setError] = useState<string | null>(null);
+
+  const loadRequest = useCallback(async () => {
+    if (!id) {
+      setRequest(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const beg = await getBegById(id);
+      setRequest(begFeedItemToRequestDetail(beg));
+    } catch (e) {
+      setRequest(null);
+      setError(
+        e instanceof PlizApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Failed to load request'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void loadRequest();
+  }, [loadRequest]);
 
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
   const [showName, setShowName] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank' | null>(null);
+  const customAmountRef = useRef<TextInput>(null);
 
-  const contributionAmount = selectedAmount ?? (customAmount ? parseInt(customAmount.replace(/\D/g, ''), 10) || 0 : 0);
-  const amountNeeded = request ? request.goal - request.raised : 0;
+  const amountNeeded = request ? Math.max(0, request.goal - request.raised) : 0;
+
+  const categoryIcon = useMemo(() => {
+    if (!request) return 'briefcase-outline' as keyof typeof Ionicons.glyphMap;
+    const cat = REQUEST_CATEGORIES.find((c) => c.id === request.categoryId);
+    return (cat?.icon ?? 'briefcase-outline') as keyof typeof Ionicons.glyphMap;
+  }, [request]);
+
+  if (!id) {
+    return (
+      <Screen backgroundColor="#FFFFFF">
+        <View style={styles.pageContent}>
+          <RequestDetailHeader />
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>Request not found</Text>
+          </View>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (loading && !request) {
+    return (
+      <Screen backgroundColor="#FFFFFF">
+        <View style={styles.pageContent}>
+          <RequestDetailHeader />
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#2E8BEA" />
+            <Text style={styles.loadingHint}>Loading request…</Text>
+          </View>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (error && !request) {
+    return (
+      <Screen backgroundColor="#FFFFFF">
+        <View style={styles.pageContent}>
+          <RequestDetailHeader />
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable
+              style={styles.retryButton}
+              onPress={() => void loadRequest()}
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading request"
+            >
+              <Text style={styles.retryLabel}>Try again</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Screen>
+    );
+  }
 
   if (!request) {
     return (
       <Screen backgroundColor="#FFFFFF">
-        <RequestDetailHeader />
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>Request not found</Text>
+        <View style={styles.pageContent}>
+          <RequestDetailHeader />
+          <View style={styles.centered}>
+            <Text style={styles.errorText}>Request not found</Text>
+          </View>
         </View>
       </Screen>
     );
@@ -83,114 +192,144 @@ export default function RequestDetailScreen() {
   const platformFee = getPlatformFee(goal);
   const requesterReceives = getRequestReceives(goal);
 
+  const reactionCounts: Record<string, number> = {
+    thumbsUp,
+    hearts,
+    gifts,
+    crowns,
+    messages,
+  };
+
+  /** Figma: clock badge shows posted time (“8h ago”), not time remaining. */
+  const fundingPostedBadge =
+    timeRemaining === 'Expired' ? 'Ended' : timeAgo;
+
   return (
     <Screen backgroundColor="#FFFFFF">
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
       >
-        <RequestDetailHeader />
+        <View style={styles.pageContent}>
+          <RequestDetailHeader
+            onReportPress={() =>
+              Alert.alert('Report request', 'Thanks for helping keep Pliz safe. Full reporting is coming soon.')
+            }
+          />
 
-        <View style={styles.requesterRow}>
-          <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-            <Text style={styles.avatarText}>{initial}</Text>
+          <View style={styles.requesterRow}>
+            <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+              <Text style={styles.avatarText}>{initial}</Text>
+            </View>
+            <View style={styles.requesterInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {name}
+                </Text>
+                {badge ? (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{badge}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={styles.metaRow}>
+                <Ionicons name={categoryIcon} size={15} color="#6B7280" style={styles.metaIcon} />
+                <Text style={styles.meta} numberOfLines={1}>
+                  {categoryLabel} · {timeAgo}
+                </Text>
+              </View>
+            </View>
           </View>
-          <View style={styles.requesterInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{name}</Text>
-              {badge && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{badge}</Text>
+
+          <Text style={styles.description}>{fullDescription}</Text>
+
+          <View style={styles.reactionsRow}>
+            {REACTION_PILLS.map(({ emoji, field }) => (
+              <View key={field} style={styles.reactionPill}>
+                <Text style={styles.reactionEmoji}>{emoji}</Text>
+                <Text style={styles.reactionCount}>{reactionCounts[field] ?? 0}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.fundingCard}>
+            <View style={styles.fundingCardTop}>
+              <View style={styles.fundingLeft}>
+                <Text style={styles.fundingAmount}>
+                  {formatNaira(raised)} / {formatNaira(goal)}
+                </Text>
+                <Text style={styles.stillNeeded}>
+                  {formatNaira(amountNeeded)} still needed
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.timeBadge,
+                  timeRemaining === 'Expired' && styles.timeBadgeMuted,
+                ]}
+              >
+                <Ionicons
+                  name="time-outline"
+                  size={14}
+                  color={timeRemaining === 'Expired' ? '#6B7280' : '#2E8BEA'}
+                />
+                <Text
+                  style={[
+                    styles.timeBadgeText,
+                    timeRemaining === 'Expired' && styles.timeBadgeTextMuted,
+                  ]}
+                >
+                  {fundingPostedBadge}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.progressWrap}>
+              <ProgressBar percent={percent} height={8} trackColor="#EEEEEE" fillColor="#2E8BEA" />
+            </View>
+
+            <View style={styles.cardDivider} />
+
+            <View style={styles.breakdownBlock}>
+              <View style={styles.breakdownLine}>
+                <Text style={styles.breakdownLabel}>Amount requested</Text>
+                <Text style={styles.breakdownValue}>{formatNaira(goal)}</Text>
+              </View>
+              <View style={styles.breakdownLine}>
+                <View style={styles.breakdownLabelRow}>
+                  <Text style={styles.breakdownLabel}>Platform fee (5%)</Text>
+                  <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
                 </View>
-              )}
-            </View>
-            <Text style={styles.meta}>
-              {categoryLabel} · {timeAgo}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.description}>{fullDescription}</Text>
-
-        <View style={styles.engagementRow}>
-          <View style={styles.engagementItem}>
-            <Ionicons name="thumbs-up-outline" size={18} color="#6B7280" />
-            <Text style={styles.engagementCount}>{thumbsUp}</Text>
-          </View>
-          <View style={styles.engagementItem}>
-            <Ionicons name="heart" size={18} color="#EF4444" />
-            <Text style={styles.engagementCount}>{hearts}</Text>
-          </View>
-          <View style={styles.engagementItem}>
-            <Ionicons name="gift-outline" size={18} color="#F59E0B" />
-            <Text style={styles.engagementCount}>{gifts}</Text>
-          </View>
-          <View style={styles.engagementItem}>
-            <Ionicons name="trophy-outline" size={18} color="#F59E0B" />
-            <Text style={styles.engagementCount}>{crowns}</Text>
-          </View>
-          <View style={styles.engagementItem}>
-            <Ionicons name="chatbubble-outline" size={18} color="#6B7280" />
-            <Text style={styles.engagementCount}>{messages}</Text>
-          </View>
-        </View>
-
-        <View style={styles.fundingSection}>
-          <View style={styles.fundingTop}>
-            <Text style={styles.fundingAmount}>
-              {formatNaira(raised)} / {formatNaira(goal)}
-            </Text>
-            <View style={styles.timeWrap}>
-              <Ionicons name="time-outline" size={14} color="#6B7280" />
-              <Text style={styles.timeText}>{timeRemaining}</Text>
+                <Text style={styles.breakdownValueMuted}>-{formatNaira(platformFee)}</Text>
+              </View>
+              <View style={[styles.breakdownLine, styles.breakdownLineLast]}>
+                <Text style={styles.breakdownReceivesLabel}>Requester receives</Text>
+                <Text style={styles.breakdownReceivesValue}>{formatNaira(requesterReceives)}</Text>
+              </View>
             </View>
           </View>
-          <Text style={styles.stillNeeded}>
-            {formatNaira(amountNeeded)} still needed
-          </Text>
-          <View style={styles.progressWrap}>
-            <ProgressBar percent={percent} height={8} />
+
+          <Text style={styles.sectionTitle}>Choose Amount</Text>
+          <View style={styles.amountGrid}>
+            {AMOUNT_OPTIONS.map((opt) => (
+              <View key={opt.value} style={styles.amountGridCell}>
+                <AmountChip
+                  label={opt.label}
+                  selected={selectedAmount === opt.value}
+                  onPress={() => {
+                    setSelectedAmount(opt.value);
+                    setCustomAmount('');
+                    customAmountRef.current?.blur();
+                  }}
+                />
+              </View>
+            ))}
           </View>
-        </View>
-
-        <View style={styles.breakdownSection}>
-          <Text style={styles.breakdownRow}>
-            Amount requested
-            <Text style={styles.breakdownValue}> {formatNaira(goal)}</Text>
-          </Text>
-          <Text style={styles.breakdownRow}>
-            Platform fee (5%) ⓘ
-            <Text style={styles.breakdownValue}> -{formatNaira(platformFee)}</Text>
-          </Text>
-          <Text style={[styles.breakdownRow, styles.breakdownReceives]}>
-            Requester receives
-            <Text style={styles.breakdownReceivesValue}> {formatNaira(requesterReceives)}</Text>
-          </Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>Choose Amount</Text>
-        <View style={styles.amountRow}>
-          {AMOUNT_OPTIONS.map((opt) => (
-            <AmountChip
-              key={opt.value}
-              label={opt.label}
-              selected={selectedAmount === opt.value}
-              onPress={() => {
-                setSelectedAmount(opt.value);
-                setCustomAmount('');
-              }}
-            />
-          ))}
-        </View>
-        <Pressable
-          style={styles.customAmountButton}
-          onPress={() => {
-            setSelectedAmount(null);
-          }}
-        >
           <TextInput
-            style={styles.customInput}
+            ref={customAmountRef}
+            style={styles.customAmountField}
             placeholder="Custom Amount"
             placeholderTextColor="#9CA3AF"
             keyboardType="number-pad"
@@ -199,102 +338,132 @@ export default function RequestDetailScreen() {
               setCustomAmount(t);
               if (t) setSelectedAmount(null);
             }}
+            onFocus={() => setSelectedAmount(null)}
           />
-        </Pressable>
 
-        <View style={styles.toggleRow}>
-          <View style={styles.toggleLeft}>
-            <Ionicons name="eye-outline" size={20} color="#1F2937" />
-            <View>
-              <Text style={styles.toggleTitle}>Show my name</Text>
-              <Text style={styles.toggleSubtitle}>
-                Recipient will see your first name
-              </Text>
+          <View style={styles.privacyCard}>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleLeft}>
+                <Ionicons name="eye-outline" size={22} color="#1F2937" />
+                <View style={styles.toggleTextWrap}>
+                  <Text style={styles.toggleTitle}>Show my name</Text>
+                  <Text style={styles.toggleSubtitle}>
+                    Recipient will see your first name
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={showName}
+                onValueChange={setShowName}
+                trackColor={{ false: '#E5E7EB', true: '#2E8BEA' }}
+                thumbColor="#FFFFFF"
+                ios_backgroundColor="#E5E7EB"
+              />
             </View>
           </View>
-          <Switch
-            value={showName}
-            onValueChange={setShowName}
-            trackColor={{ false: '#E5E7EB', true: '#93C5FD' }}
-            thumbColor="#FFFFFF"
+
+          <Text style={styles.sectionTitle}>Payment Method</Text>
+          <View style={styles.paymentRow}>
+            <Pressable
+              style={[styles.paymentChip, paymentMethod === 'card' && styles.paymentChipSelected]}
+              onPress={() => {
+                setPaymentMethod('card');
+                router.push({
+                  pathname: '/(tabs)/payment-cards',
+                  params: { requestId: id },
+                });
+              }}
+            >
+              <Ionicons
+                name="card-outline"
+                size={20}
+                color={paymentMethod === 'card' ? '#2E8BEA' : '#1F2937'}
+              />
+              <Text
+                style={[
+                  styles.paymentLabel,
+                  paymentMethod === 'card' && styles.paymentLabelSelected,
+                ]}
+              >
+                Card
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.paymentChip, paymentMethod === 'bank' && styles.paymentChipSelected]}
+              onPress={() => setPaymentMethod('bank')}
+            >
+              <Ionicons
+                name="business-outline"
+                size={20}
+                color={paymentMethod === 'bank' ? '#2E8BEA' : '#1F2937'}
+              />
+              <Text
+                style={[
+                  styles.paymentLabel,
+                  paymentMethod === 'bank' && styles.paymentLabelSelected,
+                ]}
+              >
+                Bank Transfer
+              </Text>
+            </Pressable>
+          </View>
+
+          <CTAButton
+            variant="gradient"
+            label="Continue"
+            onPress={() => {}}
           />
+
+          <Text style={styles.ctaSubtext}>
+            Only {formatNaira(amountNeeded)} needed to complete this request
+          </Text>
         </View>
-
-        <Text style={styles.sectionTitle}>Payment Method</Text>
-        <View style={styles.paymentRow}>
-          <Pressable
-            style={[styles.paymentChip, paymentMethod === 'card' && styles.paymentChipSelected]}
-            onPress={() => {
-              setPaymentMethod('card');
-              router.push({
-                pathname: '/(tabs)/payment-cards',
-                params: { requestId: id },
-              });
-            }}
-          >
-            <Ionicons
-              name="card-outline"
-              size={20}
-              color={paymentMethod === 'card' ? '#2E8BEA' : '#1F2937'}
-            />
-            <Text
-              style={[
-                styles.paymentLabel,
-                paymentMethod === 'card' && styles.paymentLabelSelected,
-              ]}
-            >
-              Card
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.paymentChip, paymentMethod === 'bank' && styles.paymentChipSelected]}
-            onPress={() => setPaymentMethod('bank')}
-          >
-            <Ionicons
-              name="business-outline"
-              size={20}
-              color={paymentMethod === 'bank' ? '#2E8BEA' : '#1F2937'}
-            />
-            <Text
-              style={[
-                styles.paymentLabel,
-                paymentMethod === 'bank' && styles.paymentLabelSelected,
-              ]}
-            >
-              Bank Transfer
-            </Text>
-          </Pressable>
-        </View>
-
-        <PrimaryButton
-          label="Continue"
-          onPress={() => {}}
-          variant="gradient"
-        />
-
-        <Text style={styles.ctaSubtext}>
-          Only {formatNaira(amountNeeded)} needed to complete this request
-        </Text>
       </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
+  pageContent: {
+    width: '100%',
+    maxWidth: REQUEST_DETAIL_MAX_WIDTH,
+    alignSelf: 'center',
+    
   },
   scrollContent: {
-    paddingBottom: 32,
+    paddingBottom: 40,
+    flexGrow: 1,
+    alignItems: 'center',
   },
   centered: {
     flex: 1,
+    minHeight: 200,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 32,
+  },
+  loadingHint: {
+    marginTop: 12,
+    fontSize: 15,
+    color: '#6B7280',
   },
   errorText: {
     fontSize: 16,
     color: '#6B7280',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+  },
+  retryLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E8BEA',
   },
   requesterRow: {
     flexDirection: 'row',
@@ -316,17 +485,20 @@ const styles = StyleSheet.create({
   },
   requesterInfo: {
     flex: 1,
+    minWidth: 0,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   name: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
+    flexShrink: 1,
   },
   badge: {
     backgroundColor: '#DBEAFE',
@@ -339,9 +511,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2E8BEA',
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaIcon: {
+    marginRight: 6,
+  },
   meta: {
     fontSize: 13,
     color: '#6B7280',
+    flex: 1,
   },
   description: {
     fontSize: 15,
@@ -349,73 +529,127 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 16,
   },
-  engagementRow: {
+  reactionsRow: {
     flexDirection: 'row',
-    gap: 20,
-    marginBottom: 24,
-  },
-  engagementItem: {
-    flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 4,
-  },
-  engagementCount: {
-    fontSize: 14,
-    color: '#1F2937',
-    fontWeight: '600',
-  },
-  fundingSection: {
+    gap: 8,
     marginBottom: 20,
   },
-  fundingTop: {
+  reactionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  reactionEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  reactionCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  fundingCard: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 24,
+  },
+  fundingCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  fundingLeft: {
+    flex: 1,
+    paddingRight: 8,
   },
   fundingAmount: {
     fontSize: 20,
     fontWeight: '700',
     color: '#1F2937',
-  },
-  timeWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timeText: {
-    fontSize: 13,
-    color: '#6B7280',
+    marginBottom: 4,
   },
   stillNeeded: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 12,
+  },
+  timeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  timeBadgeMuted: {
+    backgroundColor: '#F3F4F6',
+  },
+  timeBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2E8BEA',
+  },
+  timeBadgeTextMuted: {
+    color: '#6B7280',
   },
   progressWrap: {
-    marginBottom: 4,
+    marginBottom: 16,
   },
-  breakdownSection: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 16,
   },
-  breakdownRow: {
+  breakdownBlock: {
+    gap: 0,
+  },
+  breakdownLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  breakdownLineLast: {
+    marginBottom: 0,
+    marginTop: 4,
+  },
+  breakdownLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  breakdownLabel: {
     fontSize: 14,
     color: '#6B7280',
-    marginBottom: 8,
   },
   breakdownValue: {
-    color: '#1F2937',
+    fontSize: 14,
     fontWeight: '600',
+    color: '#1F2937',
   },
-  breakdownReceives: {
-    marginBottom: 0,
+  breakdownValueMuted: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  breakdownReceivesLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1F2937',
   },
   breakdownReceivesValue: {
-    color: '#2E8BEA',
+    fontSize: 14,
     fontWeight: '700',
+    color: '#2E8BEA',
   },
   sectionTitle: {
     fontSize: 16,
@@ -423,34 +657,53 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 12,
   },
-  amountRow: {
+  amountGrid: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  customAmountButton: {
+  amountGridCell: {
+    width: '20%',
+    marginBottom: 10,
+  },
+  /** Full-width control styled like Figma “Custom Amount” chip. */
+  customAmountField: {
+    width: '100%',
+    minHeight: 48,
     marginBottom: 24,
-  },
-  customInput: {
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     fontSize: 16,
+    fontWeight: '600',
     color: '#1F2937',
     backgroundColor: '#FFFFFF',
+    textAlign: 'center',
+  },
+  privacyCard: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 24,
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
-    paddingVertical: 8,
   },
   toggleLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+    paddingRight: 8,
+  },
+  toggleTextWrap: {
     flex: 1,
   },
   toggleTitle: {
@@ -494,48 +747,9 @@ const styles = StyleSheet.create({
   },
   ctaSubtext: {
     fontSize: 13,
-    color: '#6B7280',
+    fontWeight: '500',
+    color: '#2E8BEA',
     textAlign: 'center',
     marginTop: 12,
   },
 });
-
-// import { useLocalSearchParams } from 'expo-router';
-// import { StyleSheet, Text, View } from 'react-native';
-
-// export default function RequestDetailScreen() {
-//   const params = useLocalSearchParams<{ id: string }>();
-//   const id = typeof params.id === 'string' ? params.id : params.id?.[0];
-
-//   return (
-//     <View style={styles.container}>
-//       <Text style={styles.title}>Request Detail</Text>
-//       <Text style={styles.id}>ID: {id}</Text>
-//       <Text style={styles.text}>Basic screen is rendering correctly.</Text>
-//     </View>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: '#FFFFFF',
-//     padding: 24,
-//     justifyContent: 'center',
-//   },
-//   title: {
-//     fontSize: 24,
-//     fontWeight: '700',
-//     color: '#111827',
-//     marginBottom: 12,
-//   },
-//   id: {
-//     fontSize: 18,
-//     color: '#2563EB',
-//     marginBottom: 12,
-//   },
-//   text: {
-//     fontSize: 16,
-//     color: '#374151',
-//   },
-// });
