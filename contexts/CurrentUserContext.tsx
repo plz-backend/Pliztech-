@@ -12,7 +12,10 @@ import {
 import { getMe } from '@/lib/api/auth';
 import { PlizApiError, type MeUser } from '@/lib/api/types';
 import { clearTokens, getAccessToken } from '@/lib/auth/access-token';
-import { logoutAndGoToLogin } from '@/lib/auth/session-expired';
+import {
+  logoutAndGoToLogin,
+  recoverFromUnauthorized,
+} from '@/lib/auth/session-expired';
 
 export function displayFirstName(user: MeUser | null): string {
   if (!user) return '';
@@ -137,7 +140,27 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         if (e instanceof PlizApiError && e.status === 401) {
-          await logoutAndGoToLogin(signOut);
+          const recovered = await recoverFromUnauthorized(signOut);
+          if (recovered && seq === fetchSeq.current) {
+            const token2 = await getAccessToken();
+            if (token2) {
+              try {
+                const me = await getMe(token2);
+                if (seq === fetchSeq.current) {
+                  setUser(me);
+                }
+              } catch (e2) {
+                if (e2 instanceof PlizApiError && e2.status === 401) {
+                  await logoutAndGoToLogin(signOut);
+                } else if (seq === fetchSeq.current) {
+                  setError(e2 instanceof Error ? e2.message : 'Failed to load user');
+                  setUser(null);
+                }
+              }
+            } else {
+              await logoutAndGoToLogin(signOut);
+            }
+          }
         } else if (seq === fetchSeq.current) {
           setError(e instanceof Error ? e.message : 'Failed to load user');
           setUser(null);

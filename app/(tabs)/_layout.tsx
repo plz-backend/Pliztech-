@@ -40,6 +40,11 @@ export default function TabLayout() {
       <Stack.Screen name="personal-info" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="edit-personal-info" options={{ headerShown: false, presentation: 'card' }} />
       <Stack.Screen name="security-settings" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="change-password" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen
+        name="change-password-success"
+        options={{ headerShown: false, presentation: 'card' }}
+      />
       <Stack.Screen name="logout" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );

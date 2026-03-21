@@ -21,7 +21,7 @@ import { PlizApiError } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
 import {
   isUnauthorizedSessionError,
-  logoutAndGoToLogin,
+  recoverFromUnauthorized,
 } from '@/lib/auth/session-expired';
 import type { RecentContribution, TrendingRequest } from '@/mock/home';
 
@@ -65,8 +65,9 @@ export default function HomeScreen() {
   }, []);
 
   const loadRecentContributions = useCallback(
-    async (opts?: { background?: boolean }) => {
+    async (opts?: { background?: boolean; _retryAfterRefresh?: boolean }) => {
       const background = opts?.background ?? false;
+      const retryAfterRefresh = opts?._retryAfterRefresh ?? false;
       if (!background) {
         setRecentLoading(true);
       }
@@ -82,8 +83,15 @@ export default function HomeScreen() {
         });
         setRecentContributions(result.donations.map(myDonationToRecentContribution));
       } catch (e) {
-        if (isUnauthorizedSessionError(e)) {
-          await logoutAndGoToLogin(signOut);
+        if (isUnauthorizedSessionError(e) && !retryAfterRefresh) {
+          const recovered = await recoverFromUnauthorized(signOut);
+          if (recovered) {
+            await loadRecentContributions({
+              background,
+              _retryAfterRefresh: true,
+            });
+            return;
+          }
           return;
         }
         if (!background) {

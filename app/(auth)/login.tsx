@@ -38,9 +38,10 @@ const COLORS = {
 
 export default function LoginScreen() {
   const { refreshUser } = useCurrentUser();
-  const { registered, session } = useLocalSearchParams<{
+  const { registered, session, passwordReset } = useLocalSearchParams<{
     registered?: string;
     session?: string;
+    passwordReset?: string;
   }>();
   const sessionExpired =
     session === 'expired' ||
@@ -132,6 +133,12 @@ export default function LoginScreen() {
           {sessionExpired ? (
             <Text style={styles.sessionExpiredBanner} accessibilityLiveRegion="polite">
               Your session expired or your sign-in is no longer valid. Please sign in again.
+            </Text>
+          ) : null}
+
+          {passwordReset === '1' ? (
+            <Text style={styles.successBanner} accessibilityLiveRegion="polite">
+              Password updated. Sign in with your new password.
             </Text>
           ) : null}
 

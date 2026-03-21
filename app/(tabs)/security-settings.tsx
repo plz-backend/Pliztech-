@@ -134,7 +134,7 @@ export default function SecuritySettingsScreen() {
   const [biometric, setBiometric] = useState(true);
 
   const handleChangePassword = () => {
-    // TODO: Navigate to change password
+    router.push('/(tabs)/change-password');
   };
 
   const handleTransactionPin = () => {
@@ -166,7 +166,7 @@ export default function SecuritySettingsScreen() {
         <SecurityRow
           icon="lock-closed"
           title="Change Password"
-          subtitle="Last Changed 3 months ago"
+          subtitle="Update your account password"
           onPress={handleChangePassword}
           isLast={false}
         />

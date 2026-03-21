@@ -35,7 +35,7 @@ import { PlizApiError } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
 import {
   isUnauthorizedSessionError,
-  logoutAndGoToLogin,
+  recoverFromUnauthorized,
 } from '@/lib/auth/session-expired';
 import type { ActivityRequest, GivingContribution } from '@/mock/activity';
 
@@ -69,52 +69,88 @@ export default function ActivityScreen() {
     avgGift: 0,
   });
 
-  const loadMyRequests = useCallback(async () => {
-    setRequestsLoading(true);
-    setRequestsError(null);
-    setRequestsAuthRequired(false);
-    try {
-      const token = await getAccessToken();
-      if (!token) {
-        setRequestsAuthRequired(true);
+  const loadMyRequests = useCallback(
+    async (opts?: { _retryAfterRefresh?: boolean }) => {
+      const retryAfterRefresh = opts?._retryAfterRefresh ?? false;
+      setRequestsLoading(true);
+      setRequestsError(null);
+      setRequestsAuthRequired(false);
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          setRequestsAuthRequired(true);
+          setMyRequests([]);
+          setRequestsSummary({ total: 0, funded: 0, active: 0 });
+          return;
+        }
+
+        const result = await getMyBegs(token, { page: 1, limit: MY_BEGS_PAGE_LIMIT });
+        const rows = result.begs.map(begFeedItemToActivityRequest);
+        setMyRequests(rows);
+
+        const partial = summarizeActivityRequests(result.begs);
+        setRequestsSummary({
+          total: result.pagination.total,
+          funded: partial.funded,
+          active: partial.active,
+        });
+      } catch (e) {
+        if (isUnauthorizedSessionError(e) && !retryAfterRefresh) {
+          const recovered = await recoverFromUnauthorized(signOut);
+          if (recovered) {
+            await loadMyRequests({ _retryAfterRefresh: true });
+            return;
+          }
+          return;
+        }
         setMyRequests([]);
         setRequestsSummary({ total: 0, funded: 0, active: 0 });
-        return;
+        setRequestsError(
+          e instanceof PlizApiError ? e.message : 'Could not load your requests.'
+        );
+      } finally {
+        setRequestsLoading(false);
       }
+    },
+    [signOut]
+  );
 
-      const result = await getMyBegs(token, { page: 1, limit: MY_BEGS_PAGE_LIMIT });
-      const rows = result.begs.map(begFeedItemToActivityRequest);
-      setMyRequests(rows);
+  const loadMyGiving = useCallback(
+    async (opts?: { _retryAfterRefresh?: boolean }) => {
+      const retryAfterRefresh = opts?._retryAfterRefresh ?? false;
+      setGivingLoading(true);
+      setGivingError(null);
+      setGivingAuthRequired(false);
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          setGivingAuthRequired(true);
+          setMyGiving([]);
+          setGivingSummary({
+            totalGiven: 0,
+            peopleHelped: 0,
+            thisMonth: 0,
+            avgGift: 0,
+          });
+          return;
+        }
 
-      const partial = summarizeActivityRequests(result.begs);
-      setRequestsSummary({
-        total: result.pagination.total,
-        funded: partial.funded,
-        active: partial.active,
-      });
-    } catch (e) {
-      if (isUnauthorizedSessionError(e)) {
-        await logoutAndGoToLogin(signOut);
-        return;
-      }
-      setMyRequests([]);
-      setRequestsSummary({ total: 0, funded: 0, active: 0 });
-      setRequestsError(
-        e instanceof PlizApiError ? e.message : 'Could not load your requests.'
-      );
-    } finally {
-      setRequestsLoading(false);
-    }
-  }, [signOut]);
-
-  const loadMyGiving = useCallback(async () => {
-    setGivingLoading(true);
-    setGivingError(null);
-    setGivingAuthRequired(false);
-    try {
-      const token = await getAccessToken();
-      if (!token) {
-        setGivingAuthRequired(true);
+        const result = await getMyDonations(token, {
+          page: 1,
+          limit: MY_DONATIONS_PAGE_LIMIT,
+        });
+        const rows = result.donations.map(myDonationToGivingContribution);
+        setMyGiving(rows);
+        setGivingSummary(summarizeGivingDonations(result.donations));
+      } catch (e) {
+        if (isUnauthorizedSessionError(e) && !retryAfterRefresh) {
+          const recovered = await recoverFromUnauthorized(signOut);
+          if (recovered) {
+            await loadMyGiving({ _retryAfterRefresh: true });
+            return;
+          }
+          return;
+        }
         setMyGiving([]);
         setGivingSummary({
           totalGiven: 0,
@@ -122,35 +158,15 @@ export default function ActivityScreen() {
           thisMonth: 0,
           avgGift: 0,
         });
-        return;
+        setGivingError(
+          e instanceof PlizApiError ? e.message : 'Could not load your giving history.'
+        );
+      } finally {
+        setGivingLoading(false);
       }
-
-      const result = await getMyDonations(token, {
-        page: 1,
-        limit: MY_DONATIONS_PAGE_LIMIT,
-      });
-      const rows = result.donations.map(myDonationToGivingContribution);
-      setMyGiving(rows);
-      setGivingSummary(summarizeGivingDonations(result.donations));
-    } catch (e) {
-      if (isUnauthorizedSessionError(e)) {
-        await logoutAndGoToLogin(signOut);
-        return;
-      }
-      setMyGiving([]);
-      setGivingSummary({
-        totalGiven: 0,
-        peopleHelped: 0,
-        thisMonth: 0,
-        avgGift: 0,
-      });
-      setGivingError(
-        e instanceof PlizApiError ? e.message : 'Could not load your giving history.'
-      );
-    } finally {
-      setGivingLoading(false);
-    }
-  }, [signOut]);
+    },
+    [signOut]
+  );
 
   useFocusEffect(
     useCallback(() => {
