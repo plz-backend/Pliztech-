@@ -2,46 +2,55 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 export type ActivityRequestStatus = 'funded' | 'active' | 'expired' | 'cancelled';
 
-export const MOCK_ACTIVITY_REQUESTS = [
+/** UI row for Activity → Requests (API-backed or mock). */
+export type ActivityRequest = {
+  id: string;
+  title: string;
+  timeAgo: string;
+  status: ActivityRequestStatus;
+  amount: number;
+  categoryId: string;
+  icon: keyof typeof Ionicons.glyphMap;
+};
+
+export const MOCK_ACTIVITY_REQUESTS: ActivityRequest[] = [
   {
     id: '1',
     title: 'Transport fare to Abuja',
     timeAgo: '2 days ago',
-    status: 'funded' as ActivityRequestStatus,
+    status: 'funded',
     amount: 3200,
     categoryId: 'transport',
-    icon: 'bus-outline' as keyof typeof Ionicons.glyphMap,
+    icon: 'car-outline',
   },
   {
     id: '2',
     title: 'Utility bill assistance',
     timeAgo: '1 week ago',
-    status: 'expired' as ActivityRequestStatus,
+    status: 'expired',
     amount: 8000,
     categoryId: 'rent',
-    icon: 'flash-outline' as keyof typeof Ionicons.glyphMap,
+    icon: 'home-outline',
   },
   {
     id: '3',
     title: 'Medical check-up',
     timeAgo: '2 weeks ago',
-    status: 'active' as ActivityRequestStatus,
+    status: 'active',
     amount: 12000,
     categoryId: 'health',
-    icon: 'medical-outline' as keyof typeof Ionicons.glyphMap,
+    icon: 'medical-outline',
   },
   {
     id: '4',
     title: 'Just need Help',
     timeAgo: '2 weeks ago',
-    status: 'cancelled' as ActivityRequestStatus,
+    status: 'cancelled',
     amount: 2000,
     categoryId: 'help',
-    icon: 'heart-outline' as keyof typeof Ionicons.glyphMap,
+    icon: 'heart-outline',
   },
-] as const;
-
-export type ActivityRequest = (typeof MOCK_ACTIVITY_REQUESTS)[number];
+];
 
 export const MOCK_ACTIVITY_SUMMARY = {
   total: 4,
@@ -49,7 +58,21 @@ export const MOCK_ACTIVITY_SUMMARY = {
   active: 1,
 } as const;
 
-export const MOCK_GIVING_CONTRIBUTIONS = [
+/** UI row for Activity → Giving (API-backed or mock). */
+export type GivingContribution = {
+  id: string;
+  requestId: string;
+  recipientName: string;
+  recipientInitial: string;
+  recipientColor: string;
+  description: string;
+  amount: number;
+  timeAgo: string;
+  categoryId: string;
+  icon: keyof typeof Ionicons.glyphMap;
+};
+
+export const MOCK_GIVING_CONTRIBUTIONS: GivingContribution[] = [
   {
     id: 'g1',
     requestId: '1',
@@ -60,7 +83,7 @@ export const MOCK_GIVING_CONTRIBUTIONS = [
     amount: 5000,
     timeAgo: '2 hours ago',
     categoryId: 'rent',
-    icon: 'flash-outline' as keyof typeof Ionicons.glyphMap,
+    icon: 'home-outline',
   },
   {
     id: 'g2',
@@ -72,7 +95,7 @@ export const MOCK_GIVING_CONTRIBUTIONS = [
     amount: 4000,
     timeAgo: '2 days ago',
     categoryId: 'food',
-    icon: 'cart-outline' as keyof typeof Ionicons.glyphMap,
+    icon: 'cart-outline',
   },
   {
     id: 'g3',
@@ -84,7 +107,7 @@ export const MOCK_GIVING_CONTRIBUTIONS = [
     amount: 3000,
     timeAgo: '5 days ago',
     categoryId: 'transport',
-    icon: 'bus-outline' as keyof typeof Ionicons.glyphMap,
+    icon: 'car-outline',
   },
   {
     id: 'g4',
@@ -96,11 +119,9 @@ export const MOCK_GIVING_CONTRIBUTIONS = [
     amount: 8000,
     timeAgo: '8 days ago',
     categoryId: 'health',
-    icon: 'medical-outline' as keyof typeof Ionicons.glyphMap,
+    icon: 'medical-outline',
   },
-] as const;
-
-export type GivingContribution = (typeof MOCK_GIVING_CONTRIBUTIONS)[number];
+];
 
 export const MOCK_GIVING_SUMMARY = {
   totalGiven: 45000,

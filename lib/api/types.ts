@@ -122,7 +122,19 @@ export type MeUserProfile = {
   updatedAt: string;
 };
 
+/** From GET /api/auth/me (`user_stats` + computed peopleHelped) */
+export type MeUserStatsSummary = {
+  totalDonated: number;
+  totalReceived: number;
+  requestsCount: number;
+  /** Omitted on older API builds; treat as 0 */
+  peopleHelped?: number;
+  /** Distinct people helped via donations in the last 7 days */
+  peopleHelpedThisWeek?: number;
+};
+
 /** GET /api/auth/me — user includes profile when completed */
 export type MeUser = SignupUser & {
   profile: MeUserProfile | null;
+  stats?: MeUserStatsSummary | null;
 };

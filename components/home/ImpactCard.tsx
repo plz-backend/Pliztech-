@@ -53,7 +53,8 @@ export function ImpactCard({ totalGiven, peopleHelped, weeklyHelped }: ImpactCar
       <View style={styles.footer}>
         <Ionicons name="heart" size={14} color="#FFFFFF" style={styles.footerIcon} />
         <Text style={styles.footerText}>
-          You have helped {weeklyHelped} people this week
+          You have helped {weeklyHelped}{' '}
+          {weeklyHelped === 1 ? 'person' : 'people'} in the last 7 days
         </Text>
       </View>
     </LinearGradient>

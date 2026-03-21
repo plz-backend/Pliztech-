@@ -47,6 +47,11 @@ export default function ProfileScreen() {
   const initials = fullName ? initialsFromDisplayName(fullName) : '?';
   const showCardLoading = isLoading && !user;
 
+  const stats = user?.stats;
+  const givenNaira = Math.round(Number(stats?.totalDonated) || 0);
+  const peopleHelped = stats?.peopleHelped ?? 0;
+  const requestsCount = stats?.requestsCount ?? 0;
+
   return (
     <Screen backgroundColor="#F9FAFB" scrollable>
       <View style={styles.header}>
@@ -80,9 +85,9 @@ export default function ProfileScreen() {
           roleLabel={roleLabel}
           avatarColor={avatarColor}
           initials={initials}
-          given={0}
-          helped={0}
-          requests={0}
+          given={givenNaira}
+          helped={peopleHelped}
+          requests={requestsCount}
           isLoading={showCardLoading}
         />
 

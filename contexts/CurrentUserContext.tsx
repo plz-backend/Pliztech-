@@ -12,6 +12,7 @@ import {
 import { getMe } from '@/lib/api/auth';
 import { PlizApiError, type MeUser } from '@/lib/api/types';
 import { clearTokens, getAccessToken } from '@/lib/auth/access-token';
+import { logoutAndGoToLogin } from '@/lib/auth/session-expired';
 
 export function displayFirstName(user: MeUser | null): string {
   if (!user) return '';
@@ -76,6 +77,8 @@ type CurrentUserContextValue = {
   error: string | null;
   /** Call after login, logout, or profile updates. Deduplicates concurrent calls. */
   refreshUser: () => Promise<void>;
+  /** Clear stored tokens and user state (does not navigate). */
+  signOut: () => Promise<void>;
 };
 
 const CurrentUserContext = createContext<CurrentUserContextValue | null>(null);
@@ -92,6 +95,14 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  const signOut = useCallback(async () => {
+    fetchSeq.current += 1;
+    await clearTokens();
+    setUser(null);
+    setError(null);
+    setIsLoading(false);
+  }, []);
 
   const refreshUser = useCallback(async () => {
     if (inFlight.current) {
@@ -126,10 +137,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         if (e instanceof PlizApiError && e.status === 401) {
-          await clearTokens();
-          if (seq === fetchSeq.current) {
-            setUser(null);
-          }
+          await logoutAndGoToLogin(signOut);
         } else if (seq === fetchSeq.current) {
           setError(e instanceof Error ? e.message : 'Failed to load user');
           setUser(null);
@@ -146,7 +154,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     });
 
     return inFlight.current;
-  }, []);
+  }, [signOut]);
 
   useEffect(() => {
     void refreshUser();
@@ -158,8 +166,9 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       isLoading,
       error,
       refreshUser,
+      signOut,
     }),
-    [user, isLoading, error, refreshUser]
+    [user, isLoading, error, refreshUser, signOut]
   );
 
   return (

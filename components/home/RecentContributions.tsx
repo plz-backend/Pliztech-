@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
@@ -14,12 +14,17 @@ export interface RecentContributionsProps {
   contributions: readonly RecentContribution[];
   onSeeAll: () => void;
   onCommunityStories?: () => void;
+  loading?: boolean;
+  /** Shown when not loading and there are no rows (e.g. signed out or empty history). */
+  emptyMessage?: string | null;
 }
 
 export function RecentContributions({
   contributions,
   onSeeAll,
   onCommunityStories,
+  loading = false,
+  emptyMessage = null,
 }: RecentContributionsProps) {
   return (
     <View style={styles.section}>
@@ -35,9 +40,22 @@ export function RecentContributions({
         </Pressable>
       </View>
 
-      {contributions.map((contribution) => (
-        <ContributionCard key={contribution.id} contribution={contribution} />
-      ))}
+      {loading ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color={BRAND_BLUE} />
+          <Text style={styles.loadingText}>Loading…</Text>
+        </View>
+      ) : null}
+
+      {!loading && contributions.length === 0 && emptyMessage ? (
+        <Text style={styles.emptyText}>{emptyMessage}</Text>
+      ) : null}
+
+      {!loading
+        ? contributions.map((contribution) => (
+            <ContributionCard key={contribution.id} contribution={contribution} />
+          ))
+        : null}
 
       <View style={styles.communityStoriesWrap}>
         <CommunityStoriesCard onPress={onCommunityStories} />
@@ -71,5 +89,24 @@ const styles = StyleSheet.create({
   },
   communityStoriesWrap: {
     marginTop: 12,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 20,
+    marginBottom: 4,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingVertical: 16,
+    marginBottom: 4,
   },
 });

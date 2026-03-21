@@ -16,17 +16,26 @@ import {
 } from '@/contexts/CurrentUserContext';
 
 import { getTrendingBegs } from '@/lib/api/beg';
+import { getMyDonations, myDonationToRecentContribution } from '@/lib/api/donations';
 import { PlizApiError } from '@/lib/api/types';
-import { MOCK_IMPACT, MOCK_RECENT_CONTRIBUTIONS } from '@/mock/home';
-import type { TrendingRequest } from '@/mock/home';
+import { getAccessToken } from '@/lib/auth/access-token';
+import {
+  isUnauthorizedSessionError,
+  logoutAndGoToLogin,
+} from '@/lib/auth/session-expired';
+import type { RecentContribution, TrendingRequest } from '@/mock/home';
+
+const RECENT_CONTRIBUTIONS_HOME_LIMIT = 5;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user, isLoading, refreshUser } = useCurrentUser();
+  const { user, isLoading, refreshUser, signOut } = useCurrentUser();
   const lastHomeRefreshRef = useRef<number>(0);
   const [trending, setTrending] = useState<TrendingRequest[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
   const [trendingError, setTrendingError] = useState<string | null>(null);
+  const [recentContributions, setRecentContributions] = useState<RecentContribution[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
 
   const loadTrending = useCallback(async (opts?: { background?: boolean }) => {
     const background = opts?.background ?? false;
@@ -55,9 +64,47 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadRecentContributions = useCallback(
+    async (opts?: { background?: boolean }) => {
+      const background = opts?.background ?? false;
+      if (!background) {
+        setRecentLoading(true);
+      }
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          setRecentContributions([]);
+          return;
+        }
+        const result = await getMyDonations(token, {
+          page: 1,
+          limit: RECENT_CONTRIBUTIONS_HOME_LIMIT,
+        });
+        setRecentContributions(result.donations.map(myDonationToRecentContribution));
+      } catch (e) {
+        if (isUnauthorizedSessionError(e)) {
+          await logoutAndGoToLogin(signOut);
+          return;
+        }
+        if (!background) {
+          setRecentContributions([]);
+        }
+      } finally {
+        if (!background) {
+          setRecentLoading(false);
+        }
+      }
+    },
+    [signOut]
+  );
+
   useEffect(() => {
     void loadTrending();
   }, [loadTrending]);
+
+  useEffect(() => {
+    void loadRecentContributions();
+  }, [loadRecentContributions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -68,11 +115,28 @@ export default function HomeScreen() {
       lastHomeRefreshRef.current = now;
       void refreshUser();
       void loadTrending({ background: true });
-    }, [refreshUser, loadTrending])
+      void loadRecentContributions({ background: true });
+    }, [refreshUser, loadTrending, loadRecentContributions])
   );
 
   const firstName = isLoading && !user ? '…' : displayFirstName(user) || 'Guest';
   const role = user ? displayRoleLabel(user.role) : isLoading ? '…' : 'Member';
+
+  const impactStats = user?.stats;
+  const totalGiven = Math.round(Number(impactStats?.totalDonated) || 0);
+  const peopleHelped = impactStats?.peopleHelped ?? 0;
+  const weeklyHelped = impactStats?.peopleHelpedThisWeek ?? 0;
+
+  const recentEmptyMessage = (() => {
+    if (recentLoading || recentContributions.length > 0) return null;
+    if (!user && !isLoading) {
+      return 'Sign in to see your recent contributions.';
+    }
+    if (user) {
+      return 'No contributions yet. Browse requests to help someone.';
+    }
+    return null;
+  })();
 
   const onAskForHelp = () => {
     router.push('/(tabs)/(main)/create');
@@ -108,9 +172,9 @@ export default function HomeScreen() {
           onNotificationPress={onNotifications}
         />
         <ImpactCard
-          totalGiven={MOCK_IMPACT.totalGiven}
-          peopleHelped={MOCK_IMPACT.peopleHelped}
-          weeklyHelped={MOCK_IMPACT.weeklyHelped}
+          totalGiven={totalGiven}
+          peopleHelped={peopleHelped}
+          weeklyHelped={weeklyHelped}
         />
         <QuickActions
           onAskForHelp={onAskForHelp}
@@ -124,7 +188,9 @@ export default function HomeScreen() {
           onSeeAll={onSeeAll}
         />
         <RecentContributions
-          contributions={MOCK_RECENT_CONTRIBUTIONS}
+          contributions={recentContributions}
+          loading={recentLoading}
+          emptyMessage={recentEmptyMessage}
           onSeeAll={onSeeAllContributions}
         />
       </ScrollView>

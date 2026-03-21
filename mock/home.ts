@@ -8,6 +8,7 @@ export const MOCK_USER = {
   role: 'Community Supporter',
 } as const;
 
+/** @deprecated Home impact uses GET /api/auth/me `stats` */
 export const MOCK_IMPACT = {
   totalGiven: 45000,
   peopleHelped: 12,
@@ -65,7 +66,17 @@ export const MOCK_TRENDING_REQUESTS = [
   },
 ] as const satisfies readonly TrendingRequest[];
 
-export const MOCK_RECENT_CONTRIBUTIONS = [
+/** Home “My recent contributions” row (API-mapped or mock). */
+export type RecentContribution = {
+  id: string;
+  /** Recipient you donated to (or “Community member” if anonymous gift). */
+  contributorName: string;
+  description: string;
+  amount: number;
+  timeAgo: string;
+};
+
+export const MOCK_RECENT_CONTRIBUTIONS: RecentContribution[] = [
   {
     id: '1',
     contributorName: 'Morgan K',
@@ -80,9 +91,7 @@ export const MOCK_RECENT_CONTRIBUTIONS = [
     amount: 2500,
     timeAgo: '2 days ago',
   },
-] as const;
-
-export type RecentContribution = (typeof MOCK_RECENT_CONTRIBUTIONS)[number];
+];
 
 /** Browse feed card shape (API-mapped or mock). */
 export type BrowseRequest = {

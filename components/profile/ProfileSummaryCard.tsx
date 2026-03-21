@@ -14,9 +14,11 @@ export type ProfileSummaryCardProps = {
   roleLabel: string;
   avatarColor: string;
   initials: string;
-  /** Placeholder until donor/stats API exists */
+  /** Total amount donated (₦) */
   given?: number;
+  /** Number of distinct people (request owners) you have donated to */
   helped?: number;
+  /** Number of help requests posted */
   requests?: number;
   isLoading?: boolean;
 };
@@ -69,11 +71,13 @@ export function ProfileSummaryCard({
       </View>
       <View style={styles.statsRow}>
         <View style={styles.stat}>
-          <Text style={[styles.statValue, styles.statGiven]}>{formatNaira(given)}</Text>
+          <Text style={[styles.statValue, styles.statGiven]} numberOfLines={1} adjustsFontSizeToFit>
+            {formatNaira(given)}
+          </Text>
           <Text style={styles.statLabel}>Given</Text>
         </View>
         <View style={styles.stat}>
-          <Text style={styles.statValue}>{helped}</Text>
+          <Text style={[styles.statValue, styles.statHelped]}>{helped}</Text>
           <Text style={styles.statLabel}>Helped</Text>
         </View>
         <View style={styles.stat}>
@@ -196,6 +200,9 @@ const styles = StyleSheet.create({
   },
   statGiven: {
     color: '#2E8BEA',
+  },
+  statHelped: {
+    color: '#059669',
   },
   statLabel: {
     fontSize: 12,

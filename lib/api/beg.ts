@@ -1,7 +1,11 @@
 import { apiUrl } from '@/constants/api';
+import { REQUEST_CATEGORIES } from '@/constants/categories';
 import { avatarColorFromSeed } from '@/contexts/CurrentUserContext';
+import type { ActivityRequest, ActivityRequestStatus } from '@/mock/activity';
 import type { BrowseRequest, TrendingRequest } from '@/mock/home';
 import type { RequestDetail } from '@/mock/requests';
+
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { PlizApiError } from './types';
 
@@ -223,6 +227,111 @@ export async function getBegsFeed(options?: {
       pages: p?.pages ?? 1,
     },
   };
+}
+
+/**
+ * GET /api/begs/my-begs — current user's requests (Bearer required).
+ */
+export async function getMyBegs(
+  accessToken: string,
+  options?: { page?: number; limit?: number }
+): Promise<GetBegsFeedResult> {
+  const page = options?.page ?? 1;
+  const limit = options?.limit ?? 50;
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+
+  const res = await fetch(`${apiUrl('/api/begs/my-begs')}?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    data?: {
+      begs: BegFeedItem[];
+      pagination?: { page: number; limit: number; total: number; pages: number };
+    };
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(data.message ?? `Request failed (${res.status})`, res.status);
+  }
+
+  const begs = data.data?.begs ?? [];
+  const p = data.data?.pagination;
+  return {
+    begs,
+    pagination: {
+      page: p?.page ?? page,
+      limit: p?.limit ?? limit,
+      total: p?.total ?? begs.length,
+      pages: p?.pages ?? 1,
+    },
+  };
+}
+
+function mapBegStatusToActivityStatus(beg: BegFeedItem): ActivityRequestStatus {
+  const s = beg.status;
+  if (s === 'funded') return 'funded';
+  if (s === 'cancelled') return 'cancelled';
+  if (s === 'expired') return 'expired';
+  if (s === 'rejected') return 'cancelled';
+  if (s === 'flagged') return 'active';
+
+  const goal = Math.round(Number(beg.amountRequested) || 0);
+  const raised = Math.round(Number(beg.amountRaised) || 0);
+  if (goal > 0 && raised >= goal) return 'funded';
+  if (beg.timeRemaining === 'Expired') return 'expired';
+
+  return 'active';
+}
+
+function categoryIconForBeg(beg: BegFeedItem): keyof typeof Ionicons.glyphMap {
+  const uiId = apiCategorySlugToUiCategoryId(beg.category.slug);
+  const cat = REQUEST_CATEGORIES.find((c) => c.id === uiId);
+  return (cat?.icon ?? 'help-outline') as keyof typeof Ionicons.glyphMap;
+}
+
+/** Map GET /api/begs/my-begs item → Activity “Requests” row. */
+export function begFeedItemToActivityRequest(beg: BegFeedItem): ActivityRequest {
+  return {
+    id: beg.id,
+    title: beg.title.trim() || 'Request',
+    timeAgo: formatBegCreatedTimeAgo(beg.createdAt),
+    status: mapBegStatusToActivityStatus(beg),
+    amount: Math.round(Number(beg.amountRequested) || 0),
+    categoryId: apiCategorySlugToUiCategoryId(beg.category.slug),
+    icon: categoryIconForBeg(beg),
+  };
+}
+
+export function summarizeActivityRequests(begs: BegFeedItem[]): {
+  total: number;
+  funded: number;
+  active: number;
+} {
+  const total = begs.length;
+  let funded = 0;
+  let active = 0;
+  for (const b of begs) {
+    const uiStatus = mapBegStatusToActivityStatus(b);
+    if (uiStatus === 'funded') funded += 1;
+    if (uiStatus === 'active') active += 1;
+  }
+  return { total, funded, active };
 }
 
 /** Listing label: "First Last", or fallbacks when profile names are missing. */

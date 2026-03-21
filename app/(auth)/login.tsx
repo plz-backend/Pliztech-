@@ -38,7 +38,13 @@ const COLORS = {
 
 export default function LoginScreen() {
   const { refreshUser } = useCurrentUser();
-  const { registered } = useLocalSearchParams<{ registered?: string }>();
+  const { registered, session } = useLocalSearchParams<{
+    registered?: string;
+    session?: string;
+  }>();
+  const sessionExpired =
+    session === 'expired' ||
+    (Array.isArray(session) && session.some((s) => s === 'expired'));
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -122,6 +128,12 @@ export default function LoginScreen() {
           <Text style={styles.welcomeSubtitle}>
             Sign in to continue helping or receiving help
           </Text>
+
+          {sessionExpired ? (
+            <Text style={styles.sessionExpiredBanner} accessibilityLiveRegion="polite">
+              Your session expired or your sign-in is no longer valid. Please sign in again.
+            </Text>
+          ) : null}
 
           {registered === '1' ? (
             <Text style={styles.successBanner}>
@@ -270,6 +282,18 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     textAlign: 'left',
     alignSelf: 'stretch',
+  },
+  sessionExpiredBanner: {
+    alignSelf: 'stretch',
+    fontSize: 14,
+    color: '#92400E',
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    lineHeight: 20,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
   },
   successBanner: {
     alignSelf: 'stretch',

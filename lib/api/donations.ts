@@ -1,5 +1,12 @@
 import { API_BASE_URL, apiUrl } from '@/constants/api';
+import { REQUEST_CATEGORIES } from '@/constants/categories';
+import { avatarColorFromSeed } from '@/contexts/CurrentUserContext';
+import type { GivingContribution } from '@/mock/activity';
+import type { RecentContribution } from '@/mock/home';
 
+import Ionicons from '@expo/vector-icons/Ionicons';
+
+import { formatBegCreatedTimeAgo } from './beg';
 import { PlizApiError } from './types';
 
 /** Must match POST /api/donations/initialize validation. */
@@ -242,4 +249,191 @@ function pickPaymentReference(d: ApiDonationInitializeData): string {
 function pickDonationId(d: ApiDonationInitializeData): string {
   const id = d.donation_id ?? d.donationId ?? '';
   return typeof id === 'string' ? id : '';
+}
+
+/** GET /api/donations/my-donations item (snake_case from backend). */
+export type MyDonationApiItem = {
+  id: string;
+  amount: number;
+  is_anonymous?: boolean;
+  created_at: string;
+  request: {
+    id: string;
+    title: string;
+    status?: string;
+    category?: { name: string; icon: string | null } | null;
+    recipient_name?: string;
+    recipient_first_name?: string;
+    recipient_last_name?: string;
+  };
+};
+
+export type GetMyDonationsResult = {
+  donations: MyDonationApiItem[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+};
+
+/**
+ * Map category label from API (no slug on this payload) → UI category id for icons.
+ */
+function donationCategoryNameToUiId(name: string | undefined): string {
+  const n = (name ?? '').toLowerCase();
+  if (n.includes('food')) return 'food';
+  if (n.includes('transport')) return 'transport';
+  if (n.includes('rent') || n.includes('utilit')) return 'rent';
+  if (n.includes('medical') || n.includes('health')) return 'health';
+  if (n.includes('education')) return 'education';
+  if (n.includes('emergency') || n.includes('family')) return 'family';
+  if (n.includes('work') || n.includes('hustle')) return 'work';
+  return 'help';
+}
+
+function iconForDonationUiCategory(uiId: string): keyof typeof Ionicons.glyphMap {
+  const cat = REQUEST_CATEGORIES.find((c) => c.id === uiId);
+  return (cat?.icon ?? 'heart-outline') as keyof typeof Ionicons.glyphMap;
+}
+
+function recipientDisplayName(d: MyDonationApiItem): string {
+  const first = d.request?.recipient_first_name?.trim() ?? '';
+  const last = d.request?.recipient_last_name?.trim() ?? '';
+  const fromProfile = [first, last].filter(Boolean).join(' ').trim();
+  if (fromProfile) return fromProfile;
+  const raw = d.request?.recipient_name?.trim();
+  if (raw) return raw;
+  /** Backend omits names when the donor gave anonymously. */
+  return 'Community member';
+}
+
+function initialForDisplayName(name: string): string {
+  const t = name.trim();
+  if (!t) return '?';
+  return t.charAt(0).toUpperCase();
+}
+
+function recipientInitials(d: MyDonationApiItem, displayName: string): string {
+  const first = d.request?.recipient_first_name?.trim();
+  const last = d.request?.recipient_last_name?.trim();
+  if (first && last) {
+    return (first.charAt(0) + last.charAt(0)).toUpperCase();
+  }
+  if (first && !last) return first.charAt(0).toUpperCase();
+  if (!first && last) return last.charAt(0).toUpperCase();
+  return initialForDisplayName(displayName);
+}
+
+/** Map GET /api/donations/my-donations row → Home “My recent contributions” row. */
+export function myDonationToRecentContribution(d: MyDonationApiItem): RecentContribution {
+  return {
+    id: d.id,
+    contributorName: recipientDisplayName(d),
+    description: (d.request.title ?? 'Help request').trim() || 'Help request',
+    amount: Math.round(Number(d.amount) || 0),
+    timeAgo: formatBegCreatedTimeAgo(d.created_at),
+  };
+}
+
+/** Map GET /api/donations/my-donations row → Activity “Giving” list row. */
+export function myDonationToGivingContribution(d: MyDonationApiItem): GivingContribution {
+  const recipientName = recipientDisplayName(d);
+  const categoryId = donationCategoryNameToUiId(d.request?.category?.name);
+  return {
+    id: d.id,
+    requestId: d.request.id,
+    recipientName,
+    recipientInitial: recipientInitials(d, recipientName),
+    recipientColor: avatarColorFromSeed(d.request.id),
+    description: (d.request.title ?? 'Help request').trim() || 'Help request',
+    amount: Math.round(Number(d.amount) || 0),
+    timeAgo: formatBegCreatedTimeAgo(d.created_at),
+    categoryId,
+    icon: iconForDonationUiCategory(categoryId),
+  };
+}
+
+/**
+ * Summary stats from loaded donations only (approximate if pagination loads a subset).
+ */
+export function summarizeGivingDonations(donations: MyDonationApiItem[]): {
+  totalGiven: number;
+  peopleHelped: number;
+  thisMonth: number;
+  avgGift: number;
+} {
+  const totalGiven = Math.round(
+    donations.reduce((s, d) => s + (Number(d.amount) || 0), 0)
+  );
+  const peopleHelped = new Set(
+    donations.map((d) => d.request?.id).filter(Boolean)
+  ).size;
+  const now = new Date();
+  const y = now.getFullYear();
+  const mo = now.getMonth();
+  const thisMonth = Math.round(
+    donations
+      .filter((d) => {
+        const dt = new Date(d.created_at);
+        return dt.getFullYear() === y && dt.getMonth() === mo;
+      })
+      .reduce((s, d) => s + (Number(d.amount) || 0), 0)
+  );
+  const n = donations.length;
+  const avgGift = n > 0 ? Math.round(totalGiven / n) : 0;
+  return { totalGiven, peopleHelped, thisMonth, avgGift };
+}
+
+/**
+ * GET /api/donations/my-donations — current user’s successful donations (Bearer required).
+ */
+export async function getMyDonations(
+  accessToken: string,
+  options?: { page?: number; limit?: number }
+): Promise<GetMyDonationsResult> {
+  const page = options?.page ?? 1;
+  const limit = options?.limit ?? 50;
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+
+  const res = await fetch(
+    `${apiUrl('/api/donations/my-donations')}?${params.toString()}`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    data?: {
+      donations?: MyDonationApiItem[];
+      pagination?: { page: number; limit: number; total: number; pages: number };
+    };
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(data.message ?? `Request failed (${res.status})`, res.status);
+  }
+
+  const donations = data.data?.donations ?? [];
+  const p = data.data?.pagination;
+  return {
+    donations,
+    pagination: {
+      page: p?.page ?? page,
+      limit: p?.limit ?? limit,
+      total: p?.total ?? donations.length,
+      pages: p?.pages ?? 1,
+    },
+  };
 }

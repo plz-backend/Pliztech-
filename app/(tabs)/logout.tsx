@@ -5,29 +5,27 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/Text';
 
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
-import { clearTokens } from '@/lib/auth/access-token';
 
 /**
  * Performs sign-out then redirects to welcome. Open via router from Profile (or elsewhere).
  */
 export default function LogoutScreen() {
-  const { refreshUser } = useCurrentUser();
+  const { signOut } = useCurrentUser();
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      await clearTokens();
+      await signOut();
       if (!cancelled) {
         router.replace('/(public)/welcome' as import('expo-router').Href);
       }
-      void refreshUser();
     })();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [signOut]);
 
   return (
     <View style={styles.container} accessibilityLabel="Signing out">
