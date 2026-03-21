@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -24,7 +25,9 @@ import {
   begFeedItemToRequestDetail,
   getBegById,
 } from '@/lib/api/beg';
+import { initializeDonation } from '@/lib/api/donations';
 import { PlizApiError } from '@/lib/api/types';
+import { getAccessToken } from '@/lib/auth/access-token';
 import type { RequestDetail } from '@/mock/requests';
 import {
   getPlatformFee,
@@ -95,13 +98,91 @@ export default function RequestDetailScreen() {
     void loadRequest();
   }, [loadRequest]);
 
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  /** Default so Continue can POST without forcing a chip tap (was easy to miss → no fetch). */
+  const [selectedAmount, setSelectedAmount] = useState<number | null>(
+    AMOUNT_OPTIONS[0]?.value ?? null
+  );
   const [customAmount, setCustomAmount] = useState('');
   const [showName, setShowName] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank' | null>(null);
+  /** Default `card` so Continue can call the API without an extra tap. Bank maps to `transfer` on the server. */
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
+  const [donationSubmitting, setDonationSubmitting] = useState(false);
   const customAmountRef = useRef<TextInput>(null);
 
   const amountNeeded = request ? Math.max(0, request.goal - request.raised) : 0;
+
+  const onContinueDonation = useCallback(async () => {
+    if (donationSubmitting) return;
+    if (!id?.trim()) {
+      Alert.alert('Request', 'Missing request id. Go back and open the request again.');
+      return;
+    }
+
+    const token = await getAccessToken();
+    if (!token) {
+      Alert.alert('Sign in required', 'Please log in to donate.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log in',
+          onPress: () => router.push('/(auth)/login'),
+        },
+      ]);
+      return;
+    }
+
+    const parsedCustom = parseInt(String(customAmount).replace(/\D/g, ''), 10);
+    const rawAmount =
+      selectedAmount ?? (Number.isFinite(parsedCustom) ? parsedCustom : 0);
+
+    if (!Number.isFinite(rawAmount) || rawAmount < 100) {
+      Alert.alert('Amount', 'Select a preset amount or enter at least ₦100.');
+      return;
+    }
+
+    setDonationSubmitting(true);
+    try {
+      const result = await initializeDonation(token, {
+        begId: id,
+        amount: rawAmount,
+        paymentMethod: paymentMethod === 'bank' ? 'bank' : 'card',
+        isAnonymous: !showName,
+      });
+
+      if (result.kind === 'checkout') {
+        await WebBrowser.openBrowserAsync(result.paymentUrl);
+        void loadRequest();
+      } else {
+        Alert.alert(
+          'Payment started',
+          'Your donation is processing. You will see updates when it completes.',
+          [{ text: 'OK', onPress: () => void loadRequest() }]
+        );
+      }
+    } catch (e) {
+      if (e instanceof PlizApiError) {
+        const detail =
+          e.errors.length > 0
+            ? e.errors.map((x) => x.message).join('\n')
+            : e.message;
+        Alert.alert('Could not start donation', detail);
+      } else {
+        Alert.alert(
+          'Could not start donation',
+          e instanceof Error ? e.message : 'Something went wrong'
+        );
+      }
+    } finally {
+      setDonationSubmitting(false);
+    }
+  }, [
+    id,
+    donationSubmitting,
+    paymentMethod,
+    selectedAmount,
+    customAmount,
+    showName,
+    loadRequest,
+  ]);
 
   const categoryIcon = useMemo(() => {
     if (!request) return 'briefcase-outline' as keyof typeof Ionicons.glyphMap;
@@ -366,13 +447,7 @@ export default function RequestDetailScreen() {
           <View style={styles.paymentRow}>
             <Pressable
               style={[styles.paymentChip, paymentMethod === 'card' && styles.paymentChipSelected]}
-              onPress={() => {
-                setPaymentMethod('card');
-                router.push({
-                  pathname: '/(tabs)/payment-cards',
-                  params: { requestId: id },
-                });
-              }}
+              onPress={() => setPaymentMethod('card')}
             >
               <Ionicons
                 name="card-outline"
@@ -410,8 +485,9 @@ export default function RequestDetailScreen() {
 
           <CTAButton
             variant="gradient"
-            label="Continue"
-            onPress={() => {}}
+            label={donationSubmitting ? 'Processing…' : 'Continue'}
+            onPress={() => void onContinueDonation()}
+            disabled={donationSubmitting}
           />
 
           <Text style={styles.ctaSubtext}>
