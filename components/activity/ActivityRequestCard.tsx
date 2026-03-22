@@ -23,24 +23,31 @@ const STATUS_CONFIG: Record<
 export interface ActivityRequestCardProps {
   request: ActivityRequest;
   onPress?: () => void;
+  /**
+   * When set, navigation is handled by the parent (e.g. overlay for past requests).
+   * The default `Link` to request detail is not used.
+   */
+  onRequestPress?: (request: ActivityRequest) => void;
 }
 
-export function ActivityRequestCard({ request, onPress }: ActivityRequestCardProps) {
+export function ActivityRequestCard({ request, onPress, onRequestPress }: ActivityRequestCardProps) {
   const { id, title, timeAgo, status, amount, icon } = request;
   const config = STATUS_CONFIG[status];
 
-  return (
-    <Link
-      href={{ pathname: '/(tabs)/request/[id]', params: { id } }}
-      asChild
-      push
-    >
+  const card = (
       <TouchableOpacity
         activeOpacity={0.7}
         style={styles.card}
         accessibilityRole="button"
         accessibilityLabel={`${title}, ${status}, ${formatNaira(amount)}`}
-        onPress={onPress}
+        onPress={
+          onRequestPress
+            ? () => {
+                onPress?.();
+                onRequestPress(request);
+              }
+            : onPress
+        }
       >
       <View style={styles.iconWrap}>
         <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={24} color="#6B7280" />
@@ -61,6 +68,15 @@ export function ActivityRequestCard({ request, onPress }: ActivityRequestCardPro
         <Text style={styles.amount}>{formatNaira(amount)}</Text>
       </View>
     </TouchableOpacity>
+  );
+
+  if (onRequestPress) {
+    return card;
+  }
+
+  return (
+    <Link href={{ pathname: '/(tabs)/request/[id]', params: { id } }} asChild push>
+      {card}
     </Link>
   );
 }

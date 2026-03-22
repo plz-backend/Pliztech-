@@ -437,3 +437,71 @@ export async function getMyDonations(
     },
   };
 }
+
+/** GET /api/donations/beg/:begId — successful donations for a beg (public). */
+export type BegDonationApiItem = {
+  id: string;
+  amount: number;
+  is_anonymous?: boolean;
+  donor_name?: string;
+  created_at: string;
+};
+
+export type GetBegDonationsResult = {
+  donations: BegDonationApiItem[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+};
+
+/**
+ * GET /api/donations/beg/:begId — list donors for a request (no auth).
+ */
+export async function getBegDonations(
+  begId: string,
+  options?: { page?: number; limit?: number }
+): Promise<GetBegDonationsResult> {
+  const page = options?.page ?? 1;
+  const limit = options?.limit ?? 50;
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('limit', String(limit));
+
+  const res = await fetch(
+    `${apiUrl(`/api/donations/beg/${encodeURIComponent(begId)}`)}?${params.toString()}`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    }
+  );
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    data?: {
+      donations?: BegDonationApiItem[];
+      pagination?: { page: number; limit: number; total: number; pages: number };
+    };
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(data.message ?? `Request failed (${res.status})`, res.status);
+  }
+
+  const donations = data.data?.donations ?? [];
+  const p = data.data?.pagination;
+  return {
+    donations,
+    pagination: {
+      page: p?.page ?? page,
+      limit: p?.limit ?? limit,
+      total: p?.total ?? donations.length,
+      pages: p?.pages ?? 1,
+    },
+  };
+}

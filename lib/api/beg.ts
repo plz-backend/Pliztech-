@@ -299,6 +299,14 @@ function mapBegStatusToActivityStatus(beg: BegFeedItem): ActivityRequestStatus {
   return 'active';
 }
 
+/**
+ * After a donation, use Activity “past request” overlay instead of the live request screen
+ * when the beg is no longer active (fully funded, expired, cancelled, etc.).
+ */
+export function isBegPastOrClosedForDonorNav(beg: BegFeedItem): boolean {
+  return mapBegStatusToActivityStatus(beg) !== 'active';
+}
+
 function categoryIconForBeg(beg: BegFeedItem): keyof typeof Ionicons.glyphMap {
   const uiId = apiCategorySlugToUiCategoryId(beg.category.slug);
   const cat = REQUEST_CATEGORIES.find((c) => c.id === uiId);

@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -19,6 +20,8 @@ export interface CTAButtonProps {
   variant?: CTAButtonVariant;
   accessibilityLabel?: string;
   disabled?: boolean;
+  /** Renders before the label (e.g. paper plane for “Share story”). */
+  leftIcon?: keyof typeof Ionicons.glyphMap;
 }
 
 export function CTAButton({
@@ -27,19 +30,35 @@ export function CTAButton({
   variant = 'gradient',
   accessibilityLabel = label,
   disabled = false,
+  leftIcon,
 }: CTAButtonProps) {
+  const iconColor =
+    variant === 'gradient' || variant === 'blue'
+      ? CTA_COLORS.white
+      : CTA_COLORS.blueStart;
+
   const content = (
-    <Text
-      style={[
-        styles.label,
-        variant === 'gradient' && styles.labelWhite,
-        variant === 'white' && styles.labelBlue,
-        variant === 'transparent' && styles.labelBlue,
-        variant === 'blue' && styles.labelWhite,
-      ]}
-    >
-      {label}
-    </Text>
+    <>
+      {leftIcon ? (
+        <Ionicons
+          name={leftIcon}
+          size={20}
+          color={iconColor}
+          style={styles.leftIcon}
+        />
+      ) : null}
+      <Text
+        style={[
+          styles.label,
+          variant === 'gradient' && styles.labelWhite,
+          variant === 'white' && styles.labelBlue,
+          variant === 'transparent' && styles.labelBlue,
+          variant === 'blue' && styles.labelWhite,
+        ]}
+      >
+        {label}
+      </Text>
+    </>
   );
 
   return (
@@ -97,8 +116,13 @@ const styles = StyleSheet.create({
   },
   inner: {
     flex: 1,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
+  },
+  leftIcon: {
+    marginRight: 2,
   },
   label: {
     fontSize: 17,

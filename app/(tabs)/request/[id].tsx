@@ -1,18 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    TextInput,
+    View,
 } from 'react-native';
 
+import { DonationThankYouModal } from '@/components/donation/DonationThankYouModal';
 import { CTAButton } from '@/components/CTAButton';
 import { Text } from '@/components/Text';
 
@@ -22,16 +23,17 @@ import { RequestDetailHeader } from '@/components/request/RequestDetailHeader';
 import { Screen } from '@/components/Screen';
 import { REQUEST_CATEGORIES } from '@/constants/categories';
 import {
-  begFeedItemToRequestDetail,
-  getBegById,
+    begFeedItemToRequestDetail,
+    getBegById,
 } from '@/lib/api/beg';
 import { initializeDonation } from '@/lib/api/donations';
 import { PlizApiError } from '@/lib/api/types';
+import { savePendingDonationThankYou } from '@/lib/donation/pending-thank-you';
 import { getAccessToken } from '@/lib/auth/access-token';
 import type { RequestDetail } from '@/mock/requests';
 import {
-  getPlatformFee,
-  getRequestReceives,
+    getPlatformFee,
+    getRequestReceives,
 } from '@/mock/requests';
 
 const AMOUNT_OPTIONS = [
@@ -107,6 +109,11 @@ export default function RequestDetailScreen() {
   /** Default `card` so Continue can call the API without an extra tap. Bank maps to `transfer` on the server. */
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank'>('card');
   const [donationSubmitting, setDonationSubmitting] = useState(false);
+  const [donationThankYou, setDonationThankYou] = useState<{
+    amount: number;
+    recipientName: string;
+    showRecipientName: boolean;
+  } | null>(null);
   const customAmountRef = useRef<TextInput>(null);
 
   const amountNeeded = request ? Math.max(0, request.goal - request.raised) : 0;
@@ -149,14 +156,31 @@ export default function RequestDetailScreen() {
       });
 
       if (result.kind === 'checkout') {
+        if (request) {
+          await savePendingDonationThankYou({
+            amount: rawAmount,
+            recipientName: request.name,
+            begId: id,
+            showRecipientName: showName,
+          });
+        }
         await WebBrowser.openBrowserAsync(result.paymentUrl);
         void loadRequest();
       } else {
-        Alert.alert(
-          'Payment started',
-          'Your donation is processing. You will see updates when it completes.',
-          [{ text: 'OK', onPress: () => void loadRequest() }]
-        );
+        if (request) {
+          setDonationThankYou({
+            amount: rawAmount,
+            recipientName: request.name,
+            showRecipientName: showName,
+          });
+        } else {
+          Alert.alert(
+            'Payment started',
+            'Your donation is processing. You will see updates when it completes.',
+            [{ text: 'OK', onPress: () => void loadRequest() }]
+          );
+        }
+        void loadRequest();
       }
     } catch (e) {
       if (e instanceof PlizApiError) {
@@ -181,6 +205,7 @@ export default function RequestDetailScreen() {
     selectedAmount,
     customAmount,
     showName,
+    request,
     loadRequest,
   ]);
 
@@ -495,6 +520,17 @@ export default function RequestDetailScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      <DonationThankYouModal
+        visible={donationThankYou != null}
+        amount={donationThankYou?.amount ?? 0}
+        recipientName={donationThankYou?.recipientName ?? ''}
+        showRecipientName={donationThankYou?.showRecipientName ?? true}
+        onDone={() => {
+          setDonationThankYou(null);
+          void loadRequest();
+        }}
+      />
     </Screen>
   );
 }

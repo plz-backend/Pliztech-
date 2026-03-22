@@ -2,9 +2,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { DonationThankYouModal } from '@/components/donation/DonationThankYouModal';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
+import { consumePendingDonationThankYouIfBegMatches } from '@/lib/donation/pending-thank-you';
 import { verifyDonationByReference } from '@/lib/api/donations';
+import { navigateToBegDetailOrPastOverlay } from '@/lib/navigation/post-donation-navigation';
 
 type Phase = 'loading' | 'success' | 'error';
 
@@ -36,6 +39,11 @@ export default function PaymentCallbackScreen() {
   const [phase, setPhase] = useState<Phase>('loading');
   const [message, setMessage] = useState('');
   const [begId, setBegId] = useState<string | null>(null);
+  const [thankYouSheet, setThankYouSheet] = useState<{
+    amount: number;
+    recipientName: string;
+    showRecipientName: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,9 +64,18 @@ export default function PaymentCallbackScreen() {
       if (cancelled) return;
 
       if (result.success) {
+        const verifiedBegId = result.data?.begId ?? null;
+        setBegId(verifiedBegId);
+        const pending = await consumePendingDonationThankYouIfBegMatches(verifiedBegId);
+        if (pending) {
+          setThankYouSheet({
+            amount: pending.amount,
+            recipientName: pending.recipientName,
+            showRecipientName: pending.showRecipientName,
+          });
+        }
         setPhase('success');
         setMessage(result.message || 'Thank you! Your donation was recorded.');
-        setBegId(result.data?.begId ?? null);
       } else {
         setPhase('error');
         setMessage(
@@ -80,17 +97,28 @@ export default function PaymentCallbackScreen() {
 
   const viewRequest = useCallback(() => {
     if (begId) {
-      router.replace({
-        pathname: '/(tabs)/request/[id]',
-        params: { id: begId },
-      });
+      void navigateToBegDetailOrPastOverlay(begId, { replace: true });
     } else {
       goHome();
     }
   }, [begId, goHome]);
 
+  const onThankYouDone = useCallback(() => {
+    setThankYouSheet(null);
+    viewRequest();
+  }, [viewRequest]);
+
   return (
     <Screen backgroundColor="#FFFFFF" centerVertical>
+      <DonationThankYouModal
+        visible={thankYouSheet != null}
+        amount={thankYouSheet?.amount ?? 0}
+        recipientName={thankYouSheet?.recipientName ?? ''}
+        showRecipientName={thankYouSheet?.showRecipientName ?? true}
+        onDone={onThankYouDone}
+      />
+
+      {(phase !== 'success' || !thankYouSheet) && (
       <View style={styles.card}>
         {phase === 'loading' ? (
           <>
@@ -148,6 +176,7 @@ export default function PaymentCallbackScreen() {
           </>
         )}
       </View>
+      )}
     </Screen>
   );
 }

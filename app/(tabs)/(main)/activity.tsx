@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,7 @@ import {
 import { Text } from '@/components/Text';
 
 import { ActivityRequestCard } from '@/components/activity/ActivityRequestCard';
+import { PastRequestOverlay } from '@/components/activity/PastRequestOverlay';
 import { ActivityTypeFilters, type ActivityType } from '@/components/activity/ActivityTypeFilters';
 import { CommunityStories } from '@/components/activity/CommunityStories';
 import { GivingCard } from '@/components/activity/GivingCard';
@@ -22,6 +23,7 @@ import { SummaryCards } from '@/components/activity/SummaryCards';
 import { Screen } from '@/components/Screen';
 import {
   begFeedItemToActivityRequest,
+  getBegById,
   getMyBegs,
   summarizeActivityRequests,
 } from '@/lib/api/beg';
@@ -37,6 +39,7 @@ import {
   isUnauthorizedSessionError,
   recoverFromUnauthorized,
 } from '@/lib/auth/session-expired';
+import { consumeStashedPastOverlayBegId } from '@/lib/navigation/post-donation-navigation';
 import type { ActivityRequest, GivingContribution } from '@/mock/activity';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
@@ -44,8 +47,20 @@ const LOGO = require('@/assets/images/pliz-logo.png');
 const MY_BEGS_PAGE_LIMIT = 100;
 const MY_DONATIONS_PAGE_LIMIT = 200;
 
+function firstQueryParam(value: string | string[] | undefined): string {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value) && value[0]) return String(value[0]).trim();
+  return '';
+}
+
 export default function ActivityScreen() {
   const { signOut } = useCurrentUser();
+  const params = useLocalSearchParams<{ openPastBeg?: string | string[] }>();
+  const openPastBegParam = useMemo(
+    () => firstQueryParam(params.openPastBeg),
+    [params.openPastBeg]
+  );
+
   const [activeTab, setActiveTab] = useState<ActivityType>('requests');
 
   const [requestsLoading, setRequestsLoading] = useState(false);
@@ -68,6 +83,9 @@ export default function ActivityScreen() {
     thisMonth: 0,
     avgGift: 0,
   });
+
+  /** Past / closed request detail overlay (funded, expired, cancelled). */
+  const [pastOverlayRequest, setPastOverlayRequest] = useState<ActivityRequest | null>(null);
 
   const loadMyRequests = useCallback(
     async (opts?: { _retryAfterRefresh?: boolean }) => {
@@ -170,20 +188,45 @@ export default function ActivityScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      const fromSession = consumeStashedPastOverlayBegId();
+      const overlayBegId = openPastBegParam || fromSession;
+      if (overlayBegId) {
+        void (async () => {
+          try {
+            const beg = await getBegById(overlayBegId);
+            setActiveTab('requests');
+            setPastOverlayRequest(begFeedItemToActivityRequest(beg));
+          } catch {
+            /* ignore — user can open the request from Giving if needed */
+          }
+          if (openPastBegParam) {
+            router.setParams({ openPastBeg: undefined });
+          }
+        })();
+      }
+
       if (activeTab === 'requests') {
         void loadMyRequests();
       }
       if (activeTab === 'giving') {
         void loadMyGiving();
       }
-    }, [activeTab, loadMyRequests, loadMyGiving])
+    }, [activeTab, loadMyRequests, loadMyGiving, openPastBegParam])
   );
+
+  const handleActivityRequestPress = useCallback((item: ActivityRequest) => {
+    if (item.status === 'active') {
+      router.push({ pathname: '/(tabs)/request/[id]', params: { id: item.id } });
+      return;
+    }
+    setPastOverlayRequest(item);
+  }, []);
 
   const renderRequestItem = useCallback(
     ({ item }: { item: ActivityRequest }) => (
-      <ActivityRequestCard request={item} />
+      <ActivityRequestCard request={item} onRequestPress={handleActivityRequestPress} />
     ),
-    []
+    [handleActivityRequestPress]
   );
 
   const renderGivingItem = useCallback(
@@ -382,6 +425,12 @@ export default function ActivityScreen() {
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+      />
+
+      <PastRequestOverlay
+        visible={pastOverlayRequest != null}
+        summary={pastOverlayRequest}
+        onClose={() => setPastOverlayRequest(null)}
       />
     </Screen>
   );

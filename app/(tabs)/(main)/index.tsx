@@ -17,6 +17,7 @@ import {
 
 import { getTrendingBegs } from '@/lib/api/beg';
 import { getMyDonations, myDonationToRecentContribution } from '@/lib/api/donations';
+import { getUnreadNotificationCount } from '@/lib/api/notifications';
 import { PlizApiError } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
 import {
@@ -36,6 +37,7 @@ export default function HomeScreen() {
   const [trendingError, setTrendingError] = useState<string | null>(null);
   const [recentContributions, setRecentContributions] = useState<RecentContribution[]>([]);
   const [recentLoading, setRecentLoading] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const loadTrending = useCallback(async (opts?: { background?: boolean }) => {
     const background = opts?.background ?? false;
@@ -106,6 +108,31 @@ export default function HomeScreen() {
     [signOut]
   );
 
+  const loadUnreadNotifications = useCallback(
+    async (opts?: { _retryAfterRefresh?: boolean }) => {
+      const retryAfterRefresh = opts?._retryAfterRefresh ?? false;
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          setUnreadNotifications(0);
+          return;
+        }
+        const count = await getUnreadNotificationCount(token);
+        setUnreadNotifications(count);
+      } catch (e) {
+        if (isUnauthorizedSessionError(e) && !retryAfterRefresh) {
+          const recovered = await recoverFromUnauthorized(signOut);
+          if (recovered) {
+            await loadUnreadNotifications({ _retryAfterRefresh: true });
+            return;
+          }
+        }
+        setUnreadNotifications(0);
+      }
+    },
+    [signOut]
+  );
+
   useEffect(() => {
     void loadTrending();
   }, [loadTrending]);
@@ -113,6 +140,10 @@ export default function HomeScreen() {
   useEffect(() => {
     void loadRecentContributions();
   }, [loadRecentContributions]);
+
+  useEffect(() => {
+    void loadUnreadNotifications();
+  }, [loadUnreadNotifications]);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,7 +155,8 @@ export default function HomeScreen() {
       void refreshUser();
       void loadTrending({ background: true });
       void loadRecentContributions({ background: true });
-    }, [refreshUser, loadTrending, loadRecentContributions])
+      void loadUnreadNotifications();
+    }, [refreshUser, loadTrending, loadRecentContributions, loadUnreadNotifications])
   );
 
   const firstName = isLoading && !user ? '…' : displayFirstName(user) || 'Guest';
@@ -178,6 +210,7 @@ export default function HomeScreen() {
           firstName={firstName}
           role={role}
           onNotificationPress={onNotifications}
+          unreadNotificationCount={unreadNotifications}
         />
         <ImpactCard
           totalGiven={totalGiven}

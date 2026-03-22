@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
@@ -16,11 +16,13 @@ import { Text } from '@/components/Text';
 import { z } from 'zod';
 
 import { CategoryChip } from '@/components/create/CategoryChip';
+import { ConfirmRequestModal } from '@/components/create/ConfirmRequestModal';
+import { RequestLiveModal } from '@/components/create/RequestLiveModal';
 import { RequestLimitAlert } from '@/components/create/RequestLimitAlert';
 import { CTAButton } from '@/components/CTAButton';
 import { FormTextArea } from '@/components/FormTextArea';
 import { Screen } from '@/components/Screen';
-import { REQUEST_CATEGORIES } from '@/constants/categories';
+import { categoryEmojiForId, REQUEST_CATEGORIES } from '@/constants/categories';
 import {
   clampBegDescriptionForApi,
   createBeg,
@@ -93,6 +95,15 @@ function countWords(text: string): number {
 export default function CreateScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState<CreateRequestFormData | null>(null);
+  const [liveSuccess, setLiveSuccess] = useState<{
+    requestId: string;
+    amount: number;
+    categoryLabel: string;
+    categoryId: string;
+    expiryLine: string;
+  } | null>(null);
 
   const {
     control,
@@ -122,6 +133,40 @@ export default function CreateScreen() {
       return;
     }
 
+    const title = normalizeBegTitleForApi(data.title);
+    if (!title) {
+      Alert.alert('Title required', 'Please enter a short title for your request.');
+      return;
+    }
+
+    const cat = REQUEST_CATEGORIES.find((c) => c.id === data.categoryId);
+    if (!cat) {
+      Alert.alert('Category required', 'Please select a category.');
+      return;
+    }
+
+    setPendingSubmit(data);
+    setConfirmVisible(true);
+  };
+
+  const closeConfirmModal = () => {
+    if (isSubmitting) return;
+    setConfirmVisible(false);
+    setPendingSubmit(null);
+  };
+
+  const onConfirmSubmit = async () => {
+    const data = pendingSubmit;
+    if (!data || isSubmitting) return;
+
+    const token = await getAccessToken();
+    if (!token) {
+      Alert.alert('Sign in required', 'Please log in to submit a request.', [
+        { text: 'OK', onPress: () => router.push('/(auth)/login' as import('expo-router').Href) },
+      ]);
+      return;
+    }
+
     const amountRequested = Number(data.amount.replace(/,/g, ''));
     const descriptionForApi = clampBegDescriptionForApi(data.description);
     const title = normalizeBegTitleForApi(data.title);
@@ -132,7 +177,7 @@ export default function CreateScreen() {
 
     setIsSubmitting(true);
     try {
-      const { message } = await createBeg(token, {
+      const { beg } = await createBeg(token, {
         title,
         description: descriptionForApi,
         category: uiCategoryToApiCategory(data.categoryId),
@@ -140,16 +185,19 @@ export default function CreateScreen() {
         mediaType: 'text',
       });
 
-      Alert.alert('Request submitted', message, [
-        {
-          text: 'OK',
-          onPress: () => {
-            reset(DEFAULT_CREATE_VALUES);
-            setSelectedCategory(null);
-            router.back();
-          },
-        },
-      ]);
+      const categoryMeta = REQUEST_CATEGORIES.find((c) => c.id === data.categoryId);
+      const expiryHoursLabel =
+        EXPIRY_OPTIONS.find((o) => o.value === data.expiryHours)?.label ?? '';
+
+      setConfirmVisible(false);
+      setPendingSubmit(null);
+      setLiveSuccess({
+        requestId: beg.id,
+        amount: amountRequested,
+        categoryLabel: categoryMeta?.label ?? 'Your request',
+        categoryId: data.categoryId,
+        expiryLine: `Expires in ${expiryHoursLabel}`,
+      });
     } catch (e) {
       const msg =
         e instanceof PlizApiError
@@ -167,8 +215,64 @@ export default function CreateScreen() {
     router.back();
   };
 
+  const clearCreateFormAndLiveState = () => {
+    setLiveSuccess(null);
+    reset(DEFAULT_CREATE_VALUES);
+    setSelectedCategory(null);
+  };
+
+  const onLiveDismissOrHome = () => {
+    clearCreateFormAndLiveState();
+    router.navigate('/(tabs)/(main)/index' as Href);
+  };
+
+  const onLiveViewRequest = () => {
+    const id = liveSuccess?.requestId;
+    clearCreateFormAndLiveState();
+    if (id) {
+      router.push({ pathname: '/(tabs)/request/[id]', params: { id } } as Href);
+    }
+  };
+
+  const pendingCategory =
+    pendingSubmit != null
+      ? REQUEST_CATEGORIES.find((c) => c.id === pendingSubmit.categoryId)
+      : undefined;
+  const pendingAmount =
+    pendingSubmit != null ? Number(pendingSubmit.amount.replace(/,/g, '')) : 0;
+  const pendingExpiryLabel =
+    pendingSubmit != null
+      ? EXPIRY_OPTIONS.find((o) => o.value === pendingSubmit.expiryHours)?.label ?? ''
+      : '';
+
   return (
     <Screen backgroundColor={COLORS.background} scrollable>
+      {pendingSubmit != null && pendingCategory != null ? (
+        <ConfirmRequestModal
+          visible={confirmVisible}
+          onClose={closeConfirmModal}
+          onConfirm={onConfirmSubmit}
+          categoryLabel={pendingCategory.label}
+          categoryIcon={pendingCategory.icon}
+          title={pendingSubmit.title}
+          description={pendingSubmit.description}
+          amountRequested={pendingAmount}
+          expiryLabel={pendingExpiryLabel}
+          submitting={isSubmitting}
+        />
+      ) : null}
+      {liveSuccess != null ? (
+        <RequestLiveModal
+          visible
+          onDismiss={onLiveDismissOrHome}
+          onViewMyRequest={onLiveViewRequest}
+          onBackToHome={onLiveDismissOrHome}
+          amountRequested={liveSuccess.amount}
+          categoryLabel={liveSuccess.categoryLabel}
+          categoryEmoji={categoryEmojiForId(liveSuccess.categoryId)}
+          expiryLine={liveSuccess.expiryLine}
+        />
+      ) : null}
       <View style={styles.content}>
           <View style={styles.headerRow}>
             <Pressable
@@ -330,7 +434,7 @@ export default function CreateScreen() {
           </View>
 
           <CTAButton
-            label={isSubmitting ? 'Submitting…' : 'Continue'}
+            label="Continue"
             onPress={handleSubmit(onContinue)}
             variant="gradient"
             accessibilityLabel="Continue"

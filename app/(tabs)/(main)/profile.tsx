@@ -17,22 +17,72 @@ import {
   initialsFromDisplayName,
   useCurrentUser,
 } from '@/contexts/CurrentUserContext';
+import { formatCardBrandLabel, getSavedCards } from '@/lib/api/payment-methods';
+import { getAccessToken } from '@/lib/auth/access-token';
+import {
+  isUnauthorizedSessionError,
+  recoverFromUnauthorized,
+} from '@/lib/auth/session-expired';
+
+const PAYMENT_CARDS_SUBTITLE_DEFAULT = 'Add or manage your cards';
+
 export default function ProfileScreen() {
-  const { user, isLoading, refreshUser } = useCurrentUser();
+  const { user, isLoading, refreshUser, signOut } = useCurrentUser();
   const lastRefreshRef = useRef<number>(0);
 
   const [pushNotifications, setPushNotifications] = useState(true);
   const [anonymousMode, setAnonymousMode] = useState(false);
+  const [paymentCardsSubtitle, setPaymentCardsSubtitle] = useState(PAYMENT_CARDS_SUBTITLE_DEFAULT);
+
+  const loadPaymentCardsSubtitle = useCallback(
+    async (retryAfterRefresh = false) => {
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          setPaymentCardsSubtitle(PAYMENT_CARDS_SUBTITLE_DEFAULT);
+          return;
+        }
+        const cards = await getSavedCards(token);
+        if (cards.length === 0) {
+          setPaymentCardsSubtitle('No cards saved yet — add one when you donate');
+          return;
+        }
+        const def = cards.find((c) => c.isDefault) ?? cards[0];
+        if (!def) {
+          setPaymentCardsSubtitle(PAYMENT_CARDS_SUBTITLE_DEFAULT);
+          return;
+        }
+        const brand = formatCardBrandLabel(def.cardType);
+        if (cards.length === 1) {
+          setPaymentCardsSubtitle(`${brand} •••• ${def.last4}`);
+        } else {
+          setPaymentCardsSubtitle(
+            `${cards.length} cards · Default ${brand} •••• ${def.last4}`
+          );
+        }
+      } catch (e) {
+        if (isUnauthorizedSessionError(e) && !retryAfterRefresh) {
+          const recovered = await recoverFromUnauthorized(signOut);
+          if (recovered) {
+            await loadPaymentCardsSubtitle(true);
+          }
+          return;
+        }
+        setPaymentCardsSubtitle(PAYMENT_CARDS_SUBTITLE_DEFAULT);
+      }
+    },
+    [signOut]
+  );
 
   useFocusEffect(
     useCallback(() => {
       const now = Date.now();
-      if (now - lastRefreshRef.current < CURRENT_USER_FOCUS_REFETCH_STALE_MS) {
-        return;
+      if (now - lastRefreshRef.current >= CURRENT_USER_FOCUS_REFETCH_STALE_MS) {
+        lastRefreshRef.current = now;
+        void refreshUser();
       }
-      lastRefreshRef.current = now;
-      void refreshUser();
-    }, [refreshUser])
+      void loadPaymentCardsSubtitle();
+    }, [refreshUser, loadPaymentCardsSubtitle])
   );
 
   useEffect(() => {
@@ -97,6 +147,12 @@ export default function ProfileScreen() {
             title="Personal Information"
             subtitle="Edit your name, email, phone & change location"
             onPress={() => router.push('/(tabs)/personal-info')}
+          />
+          <ProfileRow
+            icon="wallet-outline"
+            title="Withdraw Funds"
+            subtitle="Cash out from funded requests"
+            onPress={() => router.push('/(tabs)/withdraw-funds')}
             isLast
           />
         </ProfileSection>
@@ -122,8 +178,8 @@ export default function ProfileScreen() {
           <ProfileRow
             icon="card-outline"
             title="Payment Cards"
-            subtitle="Add or manage your cards"
-            onPress={() => {}}
+            subtitle={paymentCardsSubtitle}
+            onPress={() => router.push('/(tabs)/payment-cards')}
           />
           <ProfileRow
             icon="lock-closed-outline"

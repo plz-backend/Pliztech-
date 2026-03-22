@@ -1,10 +1,12 @@
 export interface PaymentCard {
   id: string;
-  brand: 'Visa' | 'Mastercard';
+  brand: string;
   last4: string;
   expiryMonth: number;
   expiryYear: number;
   isDefault: boolean;
+  /** Issuer / bank when API provides it */
+  bank?: string | null;
 }
 
 export const MOCK_PAYMENT_CARDS: PaymentCard[] = [

@@ -16,9 +16,16 @@ export interface HomeHeaderProps {
   firstName: string;
   role: string;
   onNotificationPress?: () => void;
+  /** When &gt; 0, shows a badge on the bell (e.g. unread API count). */
+  unreadNotificationCount?: number;
 }
 
-export function HomeHeader({ firstName, role, onNotificationPress }: HomeHeaderProps) {
+export function HomeHeader({
+  firstName,
+  role,
+  onNotificationPress,
+  unreadNotificationCount = 0,
+}: HomeHeaderProps) {
   const initial = firstName.charAt(0).toUpperCase();
 
   return (
@@ -116,5 +123,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

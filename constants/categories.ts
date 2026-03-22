@@ -12,3 +12,19 @@ export const REQUEST_CATEGORIES = [
 ] as const;
 
 export type CategoryId = (typeof REQUEST_CATEGORIES)[number]['id'];
+
+/** Emoji shown on success / share surfaces (matches marketing mockups per category). */
+export const CATEGORY_EMOJI: Record<CategoryId, string> = {
+  food: '🛒',
+  health: '💊',
+  rent: '🏠',
+  family: '👨‍👩‍👧',
+  education: '📚',
+  transport: '🚗',
+  work: '💼',
+  help: '💛',
+};
+
+export function categoryEmojiForId(categoryId: string): string {
+  return CATEGORY_EMOJI[categoryId as CategoryId] ?? '🙌';
+}
