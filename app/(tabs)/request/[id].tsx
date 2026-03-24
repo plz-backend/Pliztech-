@@ -158,12 +158,16 @@ export default function RequestDetailScreen() {
 
       if (result.kind === 'checkout') {
         if (request) {
-          await savePendingDonationThankYou({
-            amount: rawAmount,
-            recipientName: request.name,
-            begId: id,
-            showRecipientName: showName,
-          });
+          try {
+            await savePendingDonationThankYou({
+              amount: rawAmount,
+              recipientName: request.name,
+              begId: id,
+              showRecipientName: showName,
+            });
+          } catch {
+            /* still open Paystack — storage must not block checkout */
+          }
         }
         await openPaystackCheckout(result.paymentUrl);
         // Web: full-page redirect to Paystack — this line won't run after assign.
