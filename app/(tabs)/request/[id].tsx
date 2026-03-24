@@ -1,6 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -12,6 +11,8 @@ import {
     TextInput,
     View,
 } from 'react-native';
+
+import { openPaystackCheckout } from '@/lib/utils/open-paystack-checkout';
 
 import { DonationThankYouModal } from '@/components/donation/DonationThankYouModal';
 import { CTAButton } from '@/components/CTAButton';
@@ -164,7 +165,8 @@ export default function RequestDetailScreen() {
             showRecipientName: showName,
           });
         }
-        await WebBrowser.openBrowserAsync(result.paymentUrl);
+        await openPaystackCheckout(result.paymentUrl);
+        // Web: full-page redirect to Paystack — this line won't run after assign.
         void loadRequest();
       } else {
         if (request) {
