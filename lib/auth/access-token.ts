@@ -4,7 +4,11 @@ import { Platform } from 'react-native';
 const ACCESS_KEY = 'pliz_access_token';
 const REFRESH_KEY = 'pliz_refresh_token';
 
-/** In-memory only on web — avoids localStorage; tokens are lost on refresh (use httpOnly cookies in production web). */
+/**
+ * Web: access token in memory only. Refresh token is stored in an httpOnly cookie set by the API
+ * (not localStorage / sessionStorage). Survives full page reload; lost when the tab closes unless
+ * the cookie expires first.
+ */
 let webAccessToken: string | null = null;
 let webRefreshToken: string | null = null;
 
@@ -33,7 +37,7 @@ export async function getRefreshToken(): Promise<string | null> {
 export async function setTokens(accessToken: string, refreshToken: string): Promise<void> {
   if (Platform.OS === 'web') {
     webAccessToken = accessToken;
-    webRefreshToken = refreshToken;
+    webRefreshToken = null;
     return;
   }
   await SecureStore.setItemAsync(ACCESS_KEY, accessToken);

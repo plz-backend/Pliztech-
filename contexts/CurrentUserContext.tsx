@@ -8,10 +8,16 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { Platform } from 'react-native';
 
-import { getMe } from '@/lib/api/auth';
+import {
+  getMe,
+  invalidateRefreshCookie,
+  logout as logoutApi,
+} from '@/lib/api/auth';
 import { PlizApiError, type MeUser } from '@/lib/api/types';
 import { clearTokens, getAccessToken } from '@/lib/auth/access-token';
+import { tryRefreshAccessToken } from '@/lib/auth/refresh-session';
 import {
   logoutAndGoToLogin,
   recoverFromUnauthorized,
@@ -101,6 +107,22 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     fetchSeq.current += 1;
+    const token = await getAccessToken();
+    try {
+      if (token) {
+        await logoutApi(token);
+      } else if (Platform.OS === 'web') {
+        await invalidateRefreshCookie();
+      }
+    } catch {
+      if (Platform.OS === 'web') {
+        try {
+          await invalidateRefreshCookie();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
     await clearTokens();
     setUser(null);
     setError(null);
@@ -117,7 +139,11 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       const hadUserAlready = userRef.current != null;
       setError(null);
 
-      const token = await getAccessToken();
+      let token = await getAccessToken();
+      if (!token && Platform.OS === 'web') {
+        await tryRefreshAccessToken();
+        token = await getAccessToken();
+      }
       if (!token) {
         if (seq === fetchSeq.current) {
           setUser(null);

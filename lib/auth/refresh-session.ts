@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { refreshAccessToken } from '@/lib/api/auth';
 
 import { getRefreshToken, setTokens } from './access-token';
@@ -16,6 +18,11 @@ export function tryRefreshAccessToken(): Promise<boolean> {
 
   refreshPromise = (async (): Promise<boolean> => {
     try {
+      if (Platform.OS === 'web') {
+        const { accessToken } = await refreshAccessToken();
+        await setTokens(accessToken, '');
+        return true;
+      }
       const rt = await getRefreshToken();
       if (!rt?.trim()) {
         return false;

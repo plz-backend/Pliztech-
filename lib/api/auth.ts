@@ -1,4 +1,5 @@
 import { apiUrl } from '@/constants/api';
+import { Platform } from 'react-native';
 
 import {
   type LoginRequestBody,
@@ -42,6 +43,52 @@ export async function signup(
   }
 
   if (!data.data?.user) {
+    throw new PlizApiError('Unexpected response shape', res.status);
+  }
+
+  return data.data;
+}
+
+/**
+ * GET /api/auth/verify-email — confirm email from signup link; returns same shape as login.
+ */
+export async function verifyEmailWithToken(
+  token: string
+): Promise<LoginSuccessData> {
+  const res = await fetch(
+    apiUrl(`/api/auth/verify-email?token=${encodeURIComponent(token.trim())}`),
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      credentials: Platform.OS === 'web' ? 'include' : 'omit',
+    }
+  );
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    errors?: { field: string; message: string }[];
+    data?: LoginSuccessData;
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(
+      data.message ?? `Request failed (${res.status})`,
+      res.status,
+      Array.isArray(data.errors) ? data.errors : []
+    );
+  }
+
+  if (!data.data?.accessToken || !data.data?.refreshToken) {
     throw new PlizApiError('Unexpected response shape', res.status);
   }
 
@@ -208,6 +255,7 @@ export async function login(body: LoginRequestBody): Promise<LoginSuccessData> {
       email: body.email.trim(),
       password: body.password,
     }),
+    credentials: Platform.OS === 'web' ? 'include' : 'omit',
   });
 
   let json: unknown;
@@ -245,17 +293,28 @@ export type RefreshAccessTokenResult = {
 
 /**
  * POST /api/auth/refresh-token — new access JWT (refresh token unchanged).
+ * On web, omit `refreshToken` to use the httpOnly cookie set at login.
  */
 export async function refreshAccessToken(
-  refreshToken: string
+  refreshToken?: string
 ): Promise<RefreshAccessTokenResult> {
+  const isWeb = Platform.OS === 'web';
+  const rt = refreshToken?.trim();
+  if (!isWeb && !rt) {
+    throw new PlizApiError('Refresh token is required', 400);
+  }
+
   const res = await fetch(apiUrl('/api/auth/refresh-token'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ refreshToken }),
+    body:
+      isWeb && !rt
+        ? JSON.stringify({})
+        : JSON.stringify({ refreshToken: rt as string }),
+    credentials: isWeb ? 'include' : 'omit',
   });
 
   let json: unknown;
@@ -279,6 +338,69 @@ export async function refreshAccessToken(
   }
 
   return { accessToken: data.data.accessToken };
+}
+
+/**
+ * POST /api/auth/logout — revoke session (Bearer required). Clears httpOnly refresh cookie on web.
+ */
+export async function logout(accessToken: string): Promise<void> {
+  const res = await fetch(apiUrl('/api/auth/logout'), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    credentials: Platform.OS === 'web' ? 'include' : 'omit',
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as { success?: boolean; message?: string };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(
+      data.message ?? `Request failed (${res.status})`,
+      res.status
+    );
+  }
+}
+
+/**
+ * POST /api/auth/invalidate-refresh-cookie — revoke session from httpOnly cookie (web only).
+ */
+export async function invalidateRefreshCookie(): Promise<void> {
+  if (Platform.OS !== 'web') {
+    return;
+  }
+
+  const res = await fetch(apiUrl('/api/auth/invalidate-refresh-cookie'), {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as { success?: boolean; message?: string };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(
+      data.message ?? `Request failed (${res.status})`,
+      res.status
+    );
+  }
 }
 
 /**
