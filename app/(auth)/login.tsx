@@ -17,6 +17,7 @@ import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { login as loginRequest } from '@/lib/api/auth';
 import { PlizApiError } from '@/lib/api/types';
 import { setTokens } from '@/lib/auth/access-token';
+import { resetSessionRecoveryState } from '@/lib/auth/session-expired';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
@@ -70,6 +71,7 @@ export default function LoginScreen() {
         password: data.password,
       });
       await setTokens(result.accessToken, result.refreshToken);
+      resetSessionRecoveryState();
       await refreshUser();
 
       if (!result.user.isProfileComplete) {

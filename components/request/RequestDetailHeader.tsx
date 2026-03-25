@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
@@ -9,6 +9,14 @@ export type RequestDetailHeaderProps = {
   /** Report / flag this request (Figma: top-right flag). */
   onReportPress?: () => void;
 };
+
+function goBackOrHome() {
+  if (router.canGoBack()) {
+    router.back();
+  } else {
+    router.replace('/(tabs)/(main)' as Href);
+  }
+}
 
 export function RequestDetailHeader({ onReportPress }: RequestDetailHeaderProps) {
   const handleReport = () => {
@@ -22,7 +30,7 @@ export function RequestDetailHeader({ onReportPress }: RequestDetailHeaderProps)
   return (
     <View style={styles.header}>
       <Pressable
-        onPress={() => router.back()}
+        onPress={goBackOrHome}
         style={styles.backCircle}
         accessibilityLabel="Go back"
         accessibilityRole="button"

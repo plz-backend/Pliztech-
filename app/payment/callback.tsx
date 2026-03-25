@@ -97,7 +97,7 @@ export default function PaymentCallbackScreen() {
 
   const viewRequest = useCallback(() => {
     if (begId) {
-      void navigateToBegDetailOrPastOverlay(begId, { replace: true });
+      void navigateToBegDetailOrPastOverlay(begId, { ensureHomeBehindDetail: true });
     } else {
       goHome();
     }

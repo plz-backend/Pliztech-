@@ -97,6 +97,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const fetchSeq = useRef(0);
   const inFlight = useRef<Promise<void> | null>(null);
+  const signOutInFlight = useRef<Promise<void> | null>(null);
   /** Latest user for refresh logic (avoids stale closure). */
   const userRef = useRef<MeUser | null>(null);
 
@@ -105,27 +106,37 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const signOut = useCallback(async () => {
-    fetchSeq.current += 1;
-    const token = await getAccessToken();
-    try {
-      if (token) {
-        await logoutApi(token);
-      } else if (isWebAuthEnvironment()) {
-        await invalidateRefreshCookie();
-      }
-    } catch {
-      if (isWebAuthEnvironment()) {
-        try {
+    if (signOutInFlight.current) {
+      return signOutInFlight.current;
+    }
+
+    signOutInFlight.current = (async () => {
+      fetchSeq.current += 1;
+      const token = await getAccessToken();
+      try {
+        if (token) {
+          await logoutApi(token);
+        } else if (isWebAuthEnvironment()) {
           await invalidateRefreshCookie();
-        } catch {
-          /* ignore */
+        }
+      } catch {
+        if (isWebAuthEnvironment()) {
+          try {
+            await invalidateRefreshCookie();
+          } catch {
+            /* ignore */
+          }
         }
       }
-    }
-    await clearTokens();
-    setUser(null);
-    setError(null);
-    setIsLoading(false);
+      await clearTokens();
+      setUser(null);
+      setError(null);
+      setIsLoading(false);
+    })().finally(() => {
+      signOutInFlight.current = null;
+    });
+
+    return signOutInFlight.current;
   }, []);
 
   const refreshUser = useCallback(async () => {

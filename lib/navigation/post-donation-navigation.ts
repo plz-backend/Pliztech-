@@ -21,12 +21,16 @@ function stashBegIdForActivityOverlay(begId: string): void {
  *
  * Used after Paystack `/payment/callback`, notification taps, etc.
  * Falls back to request detail if the beg cannot be loaded.
+ *
+ * **`ensureHomeBehindDetail`**: reset the tab stack to home, then push the destination so **Back**
+ * returns to the feed (needed after root `/payment/callback` used `replace` and left no history).
  */
 export async function navigateToBegDetailOrPastOverlay(
   begId: string,
-  options?: { replace?: boolean }
+  options?: { replace?: boolean; ensureHomeBehindDetail?: boolean }
 ): Promise<void> {
   const id = begId.trim();
+  const ensureHomeBehindDetail = options?.ensureHomeBehindDetail ?? false;
   const nav = options?.replace ? router.replace : router.push;
 
   if (!id) {
@@ -38,20 +42,33 @@ export async function navigateToBegDetailOrPastOverlay(
     const beg = await getBegById(id);
     if (isBegPastOrClosedForDonorNav(beg)) {
       stashBegIdForActivityOverlay(id);
-      nav({
+      const activityHref = {
         pathname: '/(tabs)/(main)/activity',
         params: { openPastBeg: id },
-      } as Href);
+      } as Href;
+      if (ensureHomeBehindDetail) {
+        router.replace('/(tabs)/(main)' as Href);
+        router.push(activityHref);
+      } else {
+        nav(activityHref);
+      }
       return;
     }
   } catch {
     /* fall through to request detail */
   }
 
-  nav({
+  const requestHref = {
     pathname: '/(tabs)/request/[id]',
     params: { id },
-  } as Href);
+  } as Href;
+
+  if (ensureHomeBehindDetail) {
+    router.replace('/(tabs)/(main)' as Href);
+    router.push(requestHref);
+  } else {
+    nav(requestHref);
+  }
 }
 
 /**

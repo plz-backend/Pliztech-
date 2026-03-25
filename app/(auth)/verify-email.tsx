@@ -12,6 +12,7 @@ import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { verifyEmailWithToken } from '@/lib/api/auth';
 import { PlizApiError } from '@/lib/api/types';
 import { setTokens } from '@/lib/auth/access-token';
+import { resetSessionRecoveryState } from '@/lib/auth/session-expired';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
@@ -57,6 +58,7 @@ export default function VerifyEmailScreen() {
         const result = await verifyEmailWithToken(token);
         if (cancelled) return;
         await setTokens(result.accessToken, result.refreshToken);
+        resetSessionRecoveryState();
         await refreshUser();
         if (!result.user.isProfileComplete) {
           router.replace('/(auth)/signup-profile' as import('expo-router').Href);
