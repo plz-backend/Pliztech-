@@ -8,8 +8,6 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Platform } from 'react-native';
-
 import {
   getMe,
   invalidateRefreshCookie,
@@ -18,6 +16,7 @@ import {
 import { PlizApiError, type MeUser } from '@/lib/api/types';
 import { clearTokens, getAccessToken } from '@/lib/auth/access-token';
 import { tryRefreshAccessToken } from '@/lib/auth/refresh-session';
+import { isWebAuthEnvironment } from '@/lib/auth/web-auth';
 import {
   logoutAndGoToLogin,
   recoverFromUnauthorized,
@@ -111,11 +110,11 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     try {
       if (token) {
         await logoutApi(token);
-      } else if (Platform.OS === 'web') {
+      } else if (isWebAuthEnvironment()) {
         await invalidateRefreshCookie();
       }
     } catch {
-      if (Platform.OS === 'web') {
+      if (isWebAuthEnvironment()) {
         try {
           await invalidateRefreshCookie();
         } catch {
@@ -140,7 +139,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       let token = await getAccessToken();
-      if (!token && Platform.OS === 'web') {
+      if (!token && isWebAuthEnvironment()) {
         await tryRefreshAccessToken();
         token = await getAccessToken();
       }

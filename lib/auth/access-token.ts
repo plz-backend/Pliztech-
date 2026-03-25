@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+
+import { isWebAuthEnvironment } from '@/lib/auth/web-auth';
 
 const ACCESS_KEY = 'pliz_access_token';
 const REFRESH_KEY = 'pliz_refresh_token';
@@ -13,7 +14,7 @@ let webAccessToken: string | null = null;
 let webRefreshToken: string | null = null;
 
 export async function getAccessToken(): Promise<string | null> {
-  if (Platform.OS === 'web') {
+  if (isWebAuthEnvironment()) {
     return webAccessToken;
   }
   try {
@@ -24,7 +25,7 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 export async function getRefreshToken(): Promise<string | null> {
-  if (Platform.OS === 'web') {
+  if (isWebAuthEnvironment()) {
     return webRefreshToken;
   }
   try {
@@ -35,7 +36,7 @@ export async function getRefreshToken(): Promise<string | null> {
 }
 
 export async function setTokens(accessToken: string, refreshToken: string): Promise<void> {
-  if (Platform.OS === 'web') {
+  if (isWebAuthEnvironment()) {
     webAccessToken = accessToken;
     webRefreshToken = null;
     return;
@@ -45,7 +46,7 @@ export async function setTokens(accessToken: string, refreshToken: string): Prom
 }
 
 export async function clearTokens(): Promise<void> {
-  if (Platform.OS === 'web') {
+  if (isWebAuthEnvironment()) {
     webAccessToken = null;
     webRefreshToken = null;
     return;

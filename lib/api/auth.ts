@@ -1,5 +1,5 @@
 import { apiUrl } from '@/constants/api';
-import { Platform } from 'react-native';
+import { isWebAuthEnvironment } from '@/lib/auth/web-auth';
 
 import {
   type LoginRequestBody,
@@ -62,7 +62,7 @@ export async function verifyEmailWithToken(
       headers: {
         Accept: 'application/json',
       },
-      credentials: Platform.OS === 'web' ? 'include' : 'omit',
+      credentials: isWebAuthEnvironment() ? 'include' : 'omit',
     }
   );
 
@@ -255,7 +255,7 @@ export async function login(body: LoginRequestBody): Promise<LoginSuccessData> {
       email: body.email.trim(),
       password: body.password,
     }),
-    credentials: Platform.OS === 'web' ? 'include' : 'omit',
+    credentials: isWebAuthEnvironment() ? 'include' : 'omit',
   });
 
   let json: unknown;
@@ -298,9 +298,9 @@ export type RefreshAccessTokenResult = {
 export async function refreshAccessToken(
   refreshToken?: string
 ): Promise<RefreshAccessTokenResult> {
-  const isWeb = Platform.OS === 'web';
+  const useCookie = isWebAuthEnvironment();
   const rt = refreshToken?.trim();
-  if (!isWeb && !rt) {
+  if (!useCookie && !rt) {
     throw new PlizApiError('Refresh token is required', 400);
   }
 
@@ -311,10 +311,10 @@ export async function refreshAccessToken(
       Accept: 'application/json',
     },
     body:
-      isWeb && !rt
+      useCookie && !rt
         ? JSON.stringify({})
         : JSON.stringify({ refreshToken: rt as string }),
-    credentials: isWeb ? 'include' : 'omit',
+    credentials: useCookie ? 'include' : 'omit',
   });
 
   let json: unknown;
@@ -350,7 +350,7 @@ export async function logout(accessToken: string): Promise<void> {
       Accept: 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    credentials: Platform.OS === 'web' ? 'include' : 'omit',
+    credentials: isWebAuthEnvironment() ? 'include' : 'omit',
   });
 
   let json: unknown;
@@ -374,7 +374,7 @@ export async function logout(accessToken: string): Promise<void> {
  * POST /api/auth/invalidate-refresh-cookie — revoke session from httpOnly cookie (web only).
  */
 export async function invalidateRefreshCookie(): Promise<void> {
-  if (Platform.OS !== 'web') {
+  if (!isWebAuthEnvironment()) {
     return;
   }
 
