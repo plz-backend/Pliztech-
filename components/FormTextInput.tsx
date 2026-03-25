@@ -84,7 +84,11 @@ export function FormTextInput({
           />
         )}
         <TextInput
-          style={[styles.input, leftIcon != null && styles.inputWithLeftIcon]}
+          style={[
+            styles.input,
+            leftIcon != null && styles.inputWithLeftIcon,
+            Platform.OS === 'web' && styles.inputWeb,
+          ]}
           placeholderTextColor={BODY_COLOR}
           secureTextEntry={secureTextEntry}
           accessibilityLabel={accessibilityLabel}
@@ -161,6 +165,10 @@ const styles = StyleSheet.create({
   },
   inputWithLeftIcon: {
     paddingLeft: 0,
+  },
+  /** Web: remove default focus outline inside rounded wrapper; wrapper shows border */
+  inputWeb: {
+    outlineWidth: 0,
   },
   eyeButton: {
     padding: 4,

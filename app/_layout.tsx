@@ -7,6 +7,8 @@ import 'react-native-reanimated';
 
 import { CurrentUserProvider } from '@/contexts/CurrentUserContext';
 
+import '../global.css';
+
 // GestureHandlerRootView required for react-native-gesture-handler reliability on native (iOS/Android)
 
 // export const unstable_settings = {
