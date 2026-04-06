@@ -93,7 +93,7 @@ function buildRows(
   return fundedBegs.map((beg) => {
     const uiCat = apiCategorySlugToUiCategoryId(beg.category.slug);
     const emoji = categoryEmojiForId(uiCat);
-    const title = beg.title.trim() || 'Your request';
+    const title = (beg.title ?? '').trim() || 'Your request';
     const donors = donorCountByBeg.get(beg.id) ?? 0;
     const donorSubtitle =
       donors === 0
@@ -390,7 +390,7 @@ export default function WithdrawFundsScreen() {
         }
         const uiCat = apiCategorySlugToUiCategoryId(beg.category.slug);
         const emoji = categoryEmojiForId(uiCat);
-        const title = beg.title.trim() || 'Your request';
+        const title = (beg.title ?? '').trim() || 'Your request';
         const donorSubtitle =
           donorTotal === 0
             ? 'Community supported this request'
@@ -615,10 +615,17 @@ export default function WithdrawFundsScreen() {
       });
       Alert.alert('Withdrawal', result.message, [
         {
-          text: 'OK',
+          text: 'Share a story',
           onPress: () => {
-            router.replace(withdrawFundsStep1Href());
             void load();
+            router.replace('/(tabs)/share-story' as import('expo-router').Href);
+          },
+        },
+        {
+          text: 'Done',
+          onPress: () => {
+            void load();
+            router.replace(withdrawFundsStep1Href());
           },
         },
       ]);

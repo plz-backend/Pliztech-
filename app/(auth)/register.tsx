@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { OAuthSocialSection } from '@/components/auth/OAuthSocialSection';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -11,7 +12,7 @@ import { z } from 'zod';
 import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
 import { Screen } from '@/components/Screen';
-import { SocialButton } from '@/components/SocialButton';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { signup } from '@/lib/api/auth';
 import { PlizApiError } from '@/lib/api/types';
 
@@ -57,9 +58,11 @@ const COLORS = {
 } as const;
 
 export default function RegisterScreen() {
+  const { refreshUser } = useCurrentUser();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState(false);
   const [apiMessage, setApiMessage] = useState<string | null>(null);
 
   const {
@@ -120,14 +123,6 @@ export default function RegisterScreen() {
     }
   };
 
-  const onApple = () => {
-    // TODO: expo-auth-session / Apple Auth
-  };
-
-  const onGoogle = () => {
-    // TODO: expo-auth-session / Google
-  };
-
   const onSignIn = () => {
     router.push('/(auth)/login' as import('expo-router').Href);
   };
@@ -138,9 +133,9 @@ export default function RegisterScreen() {
         <View style={styles.logoSection}>
           <Image source={LOGO} style={styles.logo} contentFit="contain" />
         </View>
-        <Text style={styles.appName}>Pliz</Text>
+        <Text style={styles.appName}>Plz</Text>
         <Text style={styles.title}>Create your account</Text>
-        <Text style={styles.subtitle}>Start your journey with Pliz</Text>
+        <Text style={styles.subtitle}>Start your journey with Plz</Text>
 
         {apiMessage ? (
           <Text style={styles.apiError} accessibilityLiveRegion="polite">
@@ -231,7 +226,7 @@ export default function RegisterScreen() {
             label={isSubmitting ? 'Creating account…' : 'Sign up'}
             onPress={handleSubmit(onSignUp)}
             variant="gradient"
-            disabled={isSubmitting}
+            disabled={isSubmitting || oauthBusy}
             accessibilityLabel="Sign up"
           />
           {isSubmitting ? (
@@ -243,16 +238,11 @@ export default function RegisterScreen() {
           ) : null}
         </View>
 
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>Or continue with</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.socialColumn}>
-          <SocialButton provider="apple" onPress={onApple} />
-          <SocialButton provider="google" onPress={onGoogle} />
-        </View>
+        <OAuthSocialSection
+          refreshUser={refreshUser}
+          onOAuthError={setApiMessage}
+          onBusyChange={setOauthBusy}
+        />
 
         <View style={styles.signInRow}>
           <Text style={styles.signInPrompt}>Already have an Account? </Text>
@@ -316,27 +306,6 @@ const styles = StyleSheet.create({
   },
   spinner: {
     marginTop: 12,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-    width: '100%',
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.body,
-    opacity: 0.4,
-  },
-  dividerText: {
-    fontSize: 14,
-    color: COLORS.body,
-  },
-  socialColumn: {
-    width: '100%',
-    gap: 12,
   },
   signInRow: {
     flexDirection: 'row',

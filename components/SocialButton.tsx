@@ -23,22 +23,30 @@ export interface SocialButtonProps {
   provider: SocialProvider;
   onPress: () => void;
   accessibilityLabel?: string;
+  disabled?: boolean;
 }
 
 export function SocialButton({
   provider,
   onPress,
   accessibilityLabel,
+  disabled = false,
 }: SocialButtonProps) {
   const { icon, label } = PROVIDER_CONFIG[provider];
   const a11y = accessibilityLabel ?? `Sign in with ${label}`;
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+      style={({ pressed }) => [
+        styles.button,
+        pressed && !disabled && styles.buttonPressed,
+        disabled && styles.buttonDisabled,
+      ]}
       onPress={onPress}
+      disabled={disabled}
       accessibilityLabel={a11y}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
     >
       <View style={styles.iconCircle}>
         <Ionicons name={icon} size={22} color={LABEL_COLOR} />
@@ -66,6 +74,9 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.8,
+  },
+  buttonDisabled: {
+    opacity: 0.45,
   },
   iconCircle: {
     width: 26,

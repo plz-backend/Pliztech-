@@ -244,7 +244,7 @@ export default function ActivityScreen() {
           <Ionicons name="person-outline" size={48} color="#D1D5DB" />
           <Text style={styles.emptyTitle}>Sign in to see your giving</Text>
           <Text style={styles.emptySubtitle}>
-            Log in to view donations you&apos;ve made on Pliz.
+            Log in to view donations you&apos;ve made on Plz.
           </Text>
           <Pressable
             style={styles.primaryCta}
@@ -277,7 +277,7 @@ export default function ActivityScreen() {
           <Ionicons name="person-outline" size={48} color="#D1D5DB" />
           <Text style={styles.emptyTitle}>Sign in to see your requests</Text>
           <Text style={styles.emptySubtitle}>
-            Log in to view requests you&apos;ve posted on Pliz.
+            Log in to view requests you&apos;ve posted on Plz.
           </Text>
           <Pressable
             style={styles.primaryCta}

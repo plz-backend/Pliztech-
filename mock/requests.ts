@@ -2,6 +2,8 @@ import { MOCK_BROWSE_REQUESTS, MOCK_TRENDING_REQUESTS } from './home';
 import type { BrowseRequest, TrendingRequest } from './home';
 
 export interface RequestDetail extends BrowseRequest {
+  /** Beg owner — hide donation UI when same as current user */
+  ownerUserId?: string;
   fullDescription: string;
   timeAgo: string;
   timeRemaining: string;
@@ -42,7 +44,6 @@ export function getPlatformFee(amount: number): number {
 
 const REQUEST_EXTRAS: Record<string, Partial<Omit<RequestDetail, keyof BrowseRequest>>> = {
   '1': {
-    badge: 'Returning',
     fullDescription:
       "Need help with transport fare to get to my new job interview in Ikeja tomorrow morning. I just got called for this opportunity and really need to make it.",
     timeAgo: '2 hours ago',

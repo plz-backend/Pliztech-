@@ -103,7 +103,7 @@ export default function ForgotPasswordScreen() {
         <View style={styles.logoSection}>
           <Image source={LOGO} style={styles.logo} contentFit="contain" />
         </View>
-        <Text style={styles.appName}>Pliz</Text>
+        <Text style={styles.appName}>Plz</Text>
         <Text style={styles.welcomeTitle}>Forgot password?</Text>
         <Text style={styles.welcomeSubtitle}>
           No worries — enter your email and we&apos;ll send you a reset link if an

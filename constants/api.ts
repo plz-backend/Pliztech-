@@ -1,5 +1,5 @@
 /**
- * Pliz REST API base URL (no trailing slash).
+ * Plz REST API base URL (no trailing slash).
  * Set EXPO_PUBLIC_API_BASE_URL in .env — restart Expo after changes.
  */
 export const API_BASE_URL = (

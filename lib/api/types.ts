@@ -4,7 +4,7 @@ export type ApiErrorItem = {
   message: string;
 };
 
-/** Parsed failure from Pliz API */
+/** Parsed failure from Plz API */
 export class PlizApiError extends Error {
   readonly status: number;
   readonly errors: ApiErrorItem[];
@@ -40,6 +40,9 @@ export type SignupUser = {
   isUnderInvestigation: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Present when API returns OAuth metadata (e.g. Google / Apple login) */
+  authProvider?: string | null;
+  avatar?: string | null;
 };
 
 export type SignupSuccessResponse = {
@@ -56,13 +59,18 @@ export type SignupErrorResponse = {
   errors?: ApiErrorItem[];
 };
 
-/** POST /api/auth/profile/complete */
+/** POST /api/auth/profile/complete — matches pliz-backend `completeProfile` */
 export type CompleteProfileBody = {
   firstName: string;
   middleName?: string;
   lastName: string;
-  phoneNumber: string;
   displayName?: string;
+  dateOfBirth: string;
+  gender: 'male' | 'female';
+  phoneNumber: string;
+  state: string;
+  city: string;
+  address?: string;
   agreeToTerms: boolean;
   isAnonymous?: boolean;
 };
@@ -71,8 +79,13 @@ export type CompletedProfile = {
   firstName: string;
   middleName: string | null;
   lastName: string;
-  phoneNumber: string;
   displayName: string | null;
+  dateOfBirth?: string;
+  gender?: string;
+  phoneNumber: string;
+  state?: string;
+  city?: string;
+  address?: string | null;
   isAnonymous: boolean;
 };
 
@@ -108,6 +121,12 @@ export type LoginSuccessData = {
   refreshToken: string;
 };
 
+/** POST /api/auth/google | /api/auth/apple — same tokens as password login + navigation hints */
+export type OAuthLoginSuccessData = LoginSuccessData & {
+  isNewUser: boolean;
+  nextStep: 'complete_profile' | 'home';
+};
+
 /** Nested profile on User (GET /api/auth/me) — matches Prisma UserProfile JSON */
 export type MeUserProfile = {
   userId: string;
@@ -118,6 +137,10 @@ export type MeUserProfile = {
   displayName: string | null;
   isAnonymous: boolean;
   agreeToTerms: boolean;
+  /** Present when API returns location fields */
+  state?: string | null;
+  city?: string | null;
+  address?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -133,8 +156,15 @@ export type MeUserStatsSummary = {
   peopleHelpedThisWeek?: number;
 };
 
+/** Govt ID / NIN verification — returned when backend adds `verification` to GET /me */
+export type MeUserVerification = {
+  documentVerified: boolean;
+};
+
 /** GET /api/auth/me — user includes profile when completed */
 export type MeUser = SignupUser & {
   profile: MeUserProfile | null;
   stats?: MeUserStatsSummary | null;
+  /** Present when API exposes UserVerification (NIN / passport / ID) */
+  verification?: MeUserVerification | null;
 };

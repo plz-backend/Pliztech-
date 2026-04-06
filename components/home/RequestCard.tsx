@@ -26,7 +26,18 @@ export interface RequestCardProps {
  * Link asChild delegates navigation to expo-router's native linking.
  */
 export function RequestCard({ request }: RequestCardProps) {
-  const { id, name, initial, avatarColor, timeAgo, text, raised, goal, percent } = request;
+  const {
+    id,
+    name,
+    initial,
+    avatarColor,
+    timeAgo,
+    expiresInLabel,
+    text,
+    raised,
+    goal,
+    percent,
+  } = request;
 
   return (
     <View style={styles.cardWrapper}>
@@ -48,7 +59,9 @@ export function RequestCard({ request }: RequestCardProps) {
             <Text style={styles.name} numberOfLines={1}>
               {name}
             </Text>
-            <Text style={styles.timeAgo}>{timeAgo}</Text>
+            <Text style={styles.timeAgo}>
+              {expiresInLabel ? `${timeAgo} · ${expiresInLabel}` : timeAgo}
+            </Text>
           </View>
 
           <Text style={styles.text} numberOfLines={3}>

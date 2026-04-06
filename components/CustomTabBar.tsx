@@ -40,7 +40,9 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 onPress={onPress}
                 style={styles.floatingButton}
                 accessibilityRole="button"
-                accessibilityLabel={options.tabBarLabel ?? route.name}
+                accessibilityLabel={
+                  typeof options.tabBarLabel === 'string' ? options.tabBarLabel : route.name
+                }
               >
                 <Ionicons name="add" size={32} color="#FFFFFF" />
               </Pressable>
@@ -66,7 +68,9 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
             style={styles.tab}
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={options.tabBarLabel ?? route.name}
+            accessibilityLabel={
+              typeof options.tabBarLabel === 'string' ? options.tabBarLabel : route.name
+            }
           >
             <Ionicons name={iconName as keyof typeof Ionicons.glyphMap} size={24} color={color} />
             <Text style={[styles.label, { color }]}>{options.title ?? route.name}</Text>

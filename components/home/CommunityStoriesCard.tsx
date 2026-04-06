@@ -17,14 +17,14 @@ export function CommunityStoriesCard({ onPress }: CommunityStoriesCardProps) {
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
       accessibilityRole="button"
-      accessibilityLabel="Community Stories - See how Pliz is making a difference"
+      accessibilityLabel="Community Stories - See how Plz is making a difference"
     >
       <View style={styles.iconWrap}>
         <Ionicons name="sparkles" size={24} color="#2E8BEA" />
       </View>
       <View style={styles.content}>
         <Text style={styles.title}>Community Stories</Text>
-        <Text style={styles.description}>See how Pliz is making a difference</Text>
+        <Text style={styles.description}>See how Plz is making a difference</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color={BODY} />
     </Pressable>

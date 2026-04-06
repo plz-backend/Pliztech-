@@ -84,7 +84,7 @@ export default function SplashScreen() {
               source={LOGO_SOURCE}
               style={styles.logo}
               contentFit="contain"
-              accessibilityLabel="Pliz app logo"
+              accessibilityLabel="Plz app logo"
               accessibilityRole="image"
             />
           </Animated.View>

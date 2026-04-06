@@ -6,9 +6,12 @@ import { useCallback, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   ActivityIndicator,
+  FlatList,
   Linking,
+  Modal,
   Pressable,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -19,6 +22,7 @@ import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
 import { Screen } from '@/components/Screen';
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
+import { NIGERIAN_STATES } from '@/constants/nigerian-states';
 import { completeProfile } from '@/lib/api/profile';
 import { PlizApiError } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
@@ -28,29 +32,83 @@ const LOGO = require('@/assets/images/pliz-logo.png');
 /** E.164 — matches pliz-backend completeProfileValidation */
 const E164_REGEX = /^\+?[1-9]\d{1,14}$/;
 
-const profileSchema = z.object({
-  firstName: z
-    .string()
-    .min(1, 'First name is required')
-    .min(2, 'First name must be at least 2 characters')
-    .max(100, 'First name is too long'),
-  middleName: z.string().max(100, 'Middle name is too long').optional(),
-  lastName: z
-    .string()
-    .min(1, 'Last name is required')
-    .min(2, 'Last name must be at least 2 characters')
-    .max(100, 'Last name is too long'),
-  displayName: z.string().max(150, 'Display name is too long').optional(),
-  phoneNumber: z
-    .string()
-    .min(1, 'Phone number is required')
-    .regex(
-      E164_REGEX,
-      'Use international format, e.g. +2348012345678 (country code, no spaces)'
-    ),
-});
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-type ProfileFormData = z.infer<typeof profileSchema>;
+function normalizeNigeriaPhoneInput(raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  if (d.length === 0) return '';
+  if (d.startsWith('234')) return `+${d}`;
+  if (d.startsWith('0')) return `+234${d.slice(1)}`;
+  return `+234${d}`;
+}
+
+function normalizeIntlPhoneInput(raw: string): string {
+  const t = raw.trim().replace(/\s/g, '');
+  if (t.length === 0) return '';
+  return t.startsWith('+') ? t : `+${t.replace(/\D/g, '')}`;
+}
+
+const profileSchema = z
+  .object({
+    firstName: z
+      .string()
+      .min(1, 'First name is required')
+      .min(2, 'First name must be at least 2 characters')
+      .max(100, 'First name is too long'),
+    middleName: z.string().max(100, 'Middle name is too long').optional(),
+    lastName: z
+      .string()
+      .min(1, 'Last name is required')
+      .min(2, 'Last name must be at least 2 characters')
+      .max(100, 'Last name is too long'),
+    displayName: z.string().max(150, 'Display name is too long').optional(),
+    dateOfBirth: z
+      .string()
+      .min(1, 'Date of birth is required')
+      .regex(ISO_DATE_REGEX, 'Use YYYY-MM-DD (e.g. 1993-05-15)')
+      .refine((s) => {
+        const dob = new Date(`${s}T12:00:00`);
+        if (Number.isNaN(dob.getTime())) return false;
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+        return age >= 18 && age <= 100;
+      }, 'You must be between 18 and 100 years old'),
+    gender: z
+      .string()
+      .refine((v) => v === 'male' || v === 'female', 'Select gender'),
+    phoneCountry: z.enum(['nigeria', 'other']),
+    phoneNumber: z.string().min(1, 'Phone number is required'),
+    state: z
+      .string()
+      .min(1, 'State is required')
+      .refine((s) => (NIGERIAN_STATES as readonly string[]).includes(s), 'Select a valid state'),
+    city: z
+      .string()
+      .min(1, 'City is required')
+      .min(2, 'City must be at least 2 characters')
+      .max(100, 'City is too long'),
+    address: z.string().max(255, 'Address is too long').optional(),
+  })
+  .superRefine((data, ctx) => {
+    const normalized =
+      data.phoneCountry === 'nigeria'
+        ? normalizeNigeriaPhoneInput(data.phoneNumber)
+        : normalizeIntlPhoneInput(data.phoneNumber);
+    if (!E164_REGEX.test(normalized)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          data.phoneCountry === 'nigeria'
+            ? 'Enter a valid Nigerian number (we add +234)'
+            : 'Use international format, e.g. +447911123456',
+        path: ['phoneNumber'],
+      });
+    }
+  });
+
+type ProfileFormData = z.input<typeof profileSchema>;
 
 const COLORS = {
   background: '#FFFFFF',
@@ -65,6 +123,8 @@ export default function SignupProfileScreen() {
   const { refreshUser } = useCurrentUser();
   const [consentChecked, setConsentChecked] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
+  const [stateModalOpen, setStateModalOpen] = useState(false);
+  const [stateSearch, setStateSearch] = useState('');
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [tokenChecked, setTokenChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,6 +147,7 @@ export default function SignupProfileScreen() {
     control,
     handleSubmit,
     setError,
+    watch,
     formState: { errors },
   } = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -95,9 +156,17 @@ export default function SignupProfileScreen() {
       middleName: '',
       lastName: '',
       displayName: '',
+      dateOfBirth: '',
+      gender: '',
+      phoneCountry: 'nigeria' as const,
       phoneNumber: '',
+      state: '',
+      city: '',
+      address: '',
     },
   });
+
+  const watchPhoneCountry = watch('phoneCountry');
 
   const applyApiFieldErrors = (err: PlizApiError) => {
     const fieldMap: Record<string, keyof ProfileFormData> = {
@@ -106,6 +175,11 @@ export default function SignupProfileScreen() {
       lastName: 'lastName',
       phoneNumber: 'phoneNumber',
       displayName: 'displayName',
+      dateOfBirth: 'dateOfBirth',
+      gender: 'gender',
+      state: 'state',
+      city: 'city',
+      address: 'address',
       agreeToTerms: 'firstName', // fallback
     };
     for (const item of err.errors) {
@@ -129,12 +203,22 @@ export default function SignupProfileScreen() {
     setApiMessage(null);
     setIsSubmitting(true);
     try {
+      const phoneNormalized =
+        data.phoneCountry === 'nigeria'
+          ? normalizeNigeriaPhoneInput(data.phoneNumber)
+          : normalizeIntlPhoneInput(data.phoneNumber);
+
       await completeProfile(accessToken, {
         firstName: data.firstName,
         middleName: data.middleName?.trim() || undefined,
         lastName: data.lastName,
-        phoneNumber: data.phoneNumber.trim(),
         displayName: data.displayName?.trim() || undefined,
+        dateOfBirth: data.dateOfBirth.trim(),
+        gender: data.gender as 'male' | 'female',
+        phoneNumber: phoneNormalized,
+        state: data.state,
+        city: data.city.trim(),
+        address: data.address?.trim() || undefined,
         agreeToTerms: true,
         isAnonymous: false,
       });
@@ -194,7 +278,7 @@ export default function SignupProfileScreen() {
           <View style={styles.backButtonSpacer} />
         </View>
 
-        <Text style={styles.appName}>Pliz</Text>
+        <Text style={styles.appName}>Plz</Text>
         <Text style={styles.title}>Tell us about yourself</Text>
         <Text style={styles.subtitle}>This helps build trust in our community</Text>
 
@@ -280,8 +364,8 @@ export default function SignupProfileScreen() {
             name="displayName"
             render={({ field: { onChange, onBlur, value } }) => (
               <FormTextInput
-                label="Display Name (optional)"
-                placeholder="Defaults to your first and last name"
+                label="Display name (optional)"
+                placeholder="Shown on your profile; used when you donate anonymously"
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
@@ -295,16 +379,218 @@ export default function SignupProfileScreen() {
 
           <Controller
             control={control}
+            name="dateOfBirth"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextInput
+                label="Date of birth"
+                placeholder="YYYY-MM-DD"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                keyboardType="numbers-and-punctuation"
+                hint="You must be 18 or older"
+                error={errors.dateOfBirth?.message}
+                accessibilityLabel="Date of birth"
+                editable={!needsSignIn}
+              />
+            )}
+          />
+
+          <Text style={styles.fieldLabel}>Gender</Text>
+          <Controller
+            control={control}
+            name="gender"
+            render={({ field: { onChange, value } }) => (
+              <View style={styles.genderRow}>
+                {(['male', 'female'] as const).map((g) => (
+                  <Pressable
+                    key={g}
+                    onPress={() => {
+                      if (!needsSignIn) onChange(g);
+                    }}
+                    style={[
+                      styles.genderChip,
+                      value === g && styles.genderChipActive,
+                      needsSignIn && styles.disabledChip,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={g === 'male' ? 'Male' : 'Female'}
+                  >
+                    <Text
+                      style={[styles.genderChipText, value === g && styles.genderChipTextActive]}
+                    >
+                      {g === 'male' ? 'Male' : 'Female'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          />
+          {errors.gender ? <Text style={styles.fieldError}>{errors.gender.message}</Text> : null}
+
+          <Text style={styles.fieldLabel}>State (Nigeria)</Text>
+          <Controller
+            control={control}
+            name="state"
+            render={({ field: { value, onChange } }) => (
+              <>
+                <Pressable
+                  onPress={() => {
+                    if (!needsSignIn) setStateModalOpen(true);
+                  }}
+                  style={[styles.stateTrigger, errors.state && styles.stateTriggerError]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select state"
+                >
+                  <Text style={value ? styles.stateTriggerText : styles.stateTriggerPlaceholder}>
+                    {value || 'Tap to select state'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color={COLORS.body} />
+                </Pressable>
+                {errors.state ? <Text style={styles.fieldError}>{errors.state.message}</Text> : null}
+                <Modal visible={stateModalOpen} animationType="slide" transparent>
+                  <View style={styles.modalRoot}>
+                    <Pressable
+                      style={styles.modalBackdrop}
+                      onPress={() => {
+                        setStateModalOpen(false);
+                        setStateSearch('');
+                      }}
+                    />
+                    <View style={styles.modalSheet}>
+                      <Text style={styles.modalTitle}>Select state</Text>
+                      <TextInput
+                        style={styles.stateSearch}
+                        placeholder="Search"
+                        placeholderTextColor="#9CA3AF"
+                        value={stateSearch}
+                        onChangeText={setStateSearch}
+                      />
+                      <FlatList
+                        data={NIGERIAN_STATES.filter((s) =>
+                          s.toLowerCase().includes(stateSearch.trim().toLowerCase())
+                        )}
+                        keyExtractor={(item) => item}
+                        keyboardShouldPersistTaps="handled"
+                        style={styles.stateList}
+                        renderItem={({ item }) => (
+                          <Pressable
+                            style={styles.stateItem}
+                            onPress={() => {
+                              onChange(item);
+                              setStateModalOpen(false);
+                              setStateSearch('');
+                            }}
+                          >
+                            <Text style={styles.stateItemText}>{item}</Text>
+                          </Pressable>
+                        )}
+                      />
+                    </View>
+                  </View>
+                </Modal>
+              </>
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="city"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextInput
+                label="City"
+                placeholder="City or town"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                autoCapitalize="words"
+                error={errors.city?.message}
+                accessibilityLabel="City"
+                editable={!needsSignIn}
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="address"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <FormTextInput
+                label="Address (optional)"
+                placeholder="Street or landmark"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                autoCapitalize="sentences"
+                error={errors.address?.message}
+                accessibilityLabel="Address"
+                editable={!needsSignIn}
+              />
+            )}
+          />
+
+          <Text style={styles.fieldLabel}>Phone country</Text>
+          <Controller
+            control={control}
+            name="phoneCountry"
+            render={({ field: { onChange, value } }) => (
+              <View style={styles.genderRow}>
+                <Pressable
+                  onPress={() => !needsSignIn && onChange('nigeria')}
+                  style={[
+                    styles.genderChip,
+                    value === 'nigeria' && styles.genderChipActive,
+                    needsSignIn && styles.disabledChip,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.genderChipText,
+                      value === 'nigeria' && styles.genderChipTextActive,
+                    ]}
+                  >
+                    Nigeria (+234)
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => !needsSignIn && onChange('other')}
+                  style={[
+                    styles.genderChip,
+                    value === 'other' && styles.genderChipActive,
+                    needsSignIn && styles.disabledChip,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.genderChipText,
+                      value === 'other' && styles.genderChipTextActive,
+                    ]}
+                  >
+                    Other
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          />
+
+          <Controller
+            control={control}
             name="phoneNumber"
             render={({ field: { onChange, onBlur, value } }) => (
               <FormTextInput
-                label="Phone Number"
-                placeholder="+2348012345678"
+                label="Phone number"
+                placeholder={
+                  watchPhoneCountry === 'nigeria' ? '8012345678' : '+447911123456'
+                }
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
                 keyboardType="phone-pad"
-                hint="International format (E.164), e.g. +234…"
+                hint={
+                  watchPhoneCountry === 'nigeria'
+                    ? 'We format numbers with +234 for Nigeria'
+                    : 'Full number in international format (E.164)'
+                }
                 error={errors.phoneNumber?.message}
                 accessibilityLabel="Phone number"
                 editable={!needsSignIn}
@@ -488,5 +774,116 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     marginBottom: 16,
     marginTop: -8,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.heading,
+    alignSelf: 'stretch',
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  fieldError: {
+    fontSize: 12,
+    color: COLORS.error,
+    alignSelf: 'stretch',
+    marginBottom: 8,
+    marginTop: -4,
+  },
+  genderRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+    alignSelf: 'stretch',
+  },
+  genderChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  genderChipActive: {
+    borderColor: COLORS.brandBlue,
+    backgroundColor: '#EFF6FF',
+  },
+  genderChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.body,
+  },
+  genderChipTextActive: {
+    color: COLORS.brandBlue,
+  },
+  disabledChip: {
+    opacity: 0.5,
+  },
+  stateTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  stateTriggerError: {
+    borderColor: COLORS.error,
+  },
+  stateTriggerText: {
+    fontSize: 16,
+    color: COLORS.heading,
+  },
+  stateTriggerPlaceholder: {
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '72%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.heading,
+    marginBottom: 12,
+  },
+  stateSearch: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    marginBottom: 8,
+    color: COLORS.heading,
+  },
+  stateList: {
+    flexGrow: 0,
+  },
+  stateItem: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  stateItemText: {
+    fontSize: 16,
+    color: COLORS.heading,
   },
 });

@@ -31,6 +31,7 @@ import { initializeDonation } from '@/lib/api/donations';
 import { PlizApiError } from '@/lib/api/types';
 import { savePendingDonationThankYou } from '@/lib/donation/pending-thank-you';
 import { getAccessToken } from '@/lib/auth/access-token';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import type { RequestDetail } from '@/mock/requests';
 import {
     getPlatformFee,
@@ -64,6 +65,7 @@ function formatNaira(amount: number) {
 const REQUEST_DETAIL_MAX_WIDTH = 960;
 
 export default function RequestDetailScreen() {
+  const { user } = useCurrentUser();
   const params = useLocalSearchParams<{ id: string }>();
   const id = typeof params.id === 'string' ? params.id : params.id?.[0];
 
@@ -299,7 +301,11 @@ export default function RequestDetailScreen() {
     gifts,
     crowns,
     messages,
+    ownerUserId,
   } = request;
+
+  const isOwner =
+    Boolean(user?.id && ownerUserId && user.id === ownerUserId);
 
   const platformFee = getPlatformFee(goal);
   const requesterReceives = getRequestReceives(goal);
@@ -327,7 +333,7 @@ export default function RequestDetailScreen() {
         <View style={styles.pageContent}>
           <RequestDetailHeader
             onReportPress={() =>
-              Alert.alert('Report request', 'Thanks for helping keep Pliz safe. Full reporting is coming soon.')
+              Alert.alert('Report request', 'Thanks for helping keep Plz safe. Full reporting is coming soon.')
             }
           />
 
@@ -423,107 +429,118 @@ export default function RequestDetailScreen() {
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Choose Amount</Text>
-          <View style={styles.amountGrid}>
-            {AMOUNT_OPTIONS.map((opt) => (
-              <View key={opt.value} style={styles.amountGridCell}>
-                <AmountChip
-                  label={opt.label}
-                  selected={selectedAmount === opt.value}
-                  onPress={() => {
-                    setSelectedAmount(opt.value);
-                    setCustomAmount('');
-                    customAmountRef.current?.blur();
-                  }}
-                />
+          {isOwner ? (
+            <View style={styles.ownerNotice}>
+              <Ionicons name="information-circle-outline" size={22} color="#2E8BEA" />
+              <Text style={styles.ownerNoticeText}>
+                You can&apos;t donate to your own request. Share this request so others can contribute.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.sectionTitle}>Choose Amount</Text>
+              <View style={styles.amountGrid}>
+                {AMOUNT_OPTIONS.map((opt) => (
+                  <View key={opt.value} style={styles.amountGridCell}>
+                    <AmountChip
+                      label={opt.label}
+                      selected={selectedAmount === opt.value}
+                      onPress={() => {
+                        setSelectedAmount(opt.value);
+                        setCustomAmount('');
+                        customAmountRef.current?.blur();
+                      }}
+                    />
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-          <TextInput
-            ref={customAmountRef}
-            style={styles.customAmountField}
-            placeholder="Custom Amount"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="number-pad"
-            value={customAmount}
-            onChangeText={(t) => {
-              setCustomAmount(t);
-              if (t) setSelectedAmount(null);
-            }}
-            onFocus={() => setSelectedAmount(null)}
-          />
+              <TextInput
+                ref={customAmountRef}
+                style={styles.customAmountField}
+                placeholder="Custom Amount"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="number-pad"
+                value={customAmount}
+                onChangeText={(t) => {
+                  setCustomAmount(t);
+                  if (t) setSelectedAmount(null);
+                }}
+                onFocus={() => setSelectedAmount(null)}
+              />
 
-          <View style={styles.privacyCard}>
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleLeft}>
-                <Ionicons name="eye-outline" size={22} color="#1F2937" />
-                <View style={styles.toggleTextWrap}>
-                  <Text style={styles.toggleTitle}>Show my name</Text>
-                  <Text style={styles.toggleSubtitle}>
-                    Recipient will see your first name
-                  </Text>
+              <View style={styles.privacyCard}>
+                <View style={styles.toggleRow}>
+                  <View style={styles.toggleLeft}>
+                    <Ionicons name="eye-outline" size={22} color="#1F2937" />
+                    <View style={styles.toggleTextWrap}>
+                      <Text style={styles.toggleTitle}>Show my name</Text>
+                      <Text style={styles.toggleSubtitle}>
+                        If off, your display name stays private when donating anonymously
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={showName}
+                    onValueChange={setShowName}
+                    trackColor={{ false: '#E5E7EB', true: '#2E8BEA' }}
+                    thumbColor="#FFFFFF"
+                    ios_backgroundColor="#E5E7EB"
+                  />
                 </View>
               </View>
-              <Switch
-                value={showName}
-                onValueChange={setShowName}
-                trackColor={{ false: '#E5E7EB', true: '#2E8BEA' }}
-                thumbColor="#FFFFFF"
-                ios_backgroundColor="#E5E7EB"
-              />
-            </View>
-          </View>
 
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.paymentRow}>
-            <Pressable
-              style={[styles.paymentChip, paymentMethod === 'card' && styles.paymentChipSelected]}
-              onPress={() => setPaymentMethod('card')}
-            >
-              <Ionicons
-                name="card-outline"
-                size={20}
-                color={paymentMethod === 'card' ? '#2E8BEA' : '#1F2937'}
+              <Text style={styles.sectionTitle}>Payment Method</Text>
+              <View style={styles.paymentRow}>
+                <Pressable
+                  style={[styles.paymentChip, paymentMethod === 'card' && styles.paymentChipSelected]}
+                  onPress={() => setPaymentMethod('card')}
+                >
+                  <Ionicons
+                    name="card-outline"
+                    size={20}
+                    color={paymentMethod === 'card' ? '#2E8BEA' : '#1F2937'}
+                  />
+                  <Text
+                    style={[
+                      styles.paymentLabel,
+                      paymentMethod === 'card' && styles.paymentLabelSelected,
+                    ]}
+                  >
+                    Card
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.paymentChip, paymentMethod === 'bank' && styles.paymentChipSelected]}
+                  onPress={() => setPaymentMethod('bank')}
+                >
+                  <Ionicons
+                    name="business-outline"
+                    size={20}
+                    color={paymentMethod === 'bank' ? '#2E8BEA' : '#1F2937'}
+                  />
+                  <Text
+                    style={[
+                      styles.paymentLabel,
+                      paymentMethod === 'bank' && styles.paymentLabelSelected,
+                    ]}
+                  >
+                    Bank Transfer
+                  </Text>
+                </Pressable>
+              </View>
+
+              <CTAButton
+                variant="gradient"
+                label={donationSubmitting ? 'Processing…' : 'Continue'}
+                onPress={() => void onContinueDonation()}
+                disabled={donationSubmitting}
               />
-              <Text
-                style={[
-                  styles.paymentLabel,
-                  paymentMethod === 'card' && styles.paymentLabelSelected,
-                ]}
-              >
-                Card
+
+              <Text style={styles.ctaSubtext}>
+                Only {formatNaira(amountNeeded)} needed to complete this request
               </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.paymentChip, paymentMethod === 'bank' && styles.paymentChipSelected]}
-              onPress={() => setPaymentMethod('bank')}
-            >
-              <Ionicons
-                name="business-outline"
-                size={20}
-                color={paymentMethod === 'bank' ? '#2E8BEA' : '#1F2937'}
-              />
-              <Text
-                style={[
-                  styles.paymentLabel,
-                  paymentMethod === 'bank' && styles.paymentLabelSelected,
-                ]}
-              >
-                Bank Transfer
-              </Text>
-            </Pressable>
-          </View>
-
-          <CTAButton
-            variant="gradient"
-            label={donationSubmitting ? 'Processing…' : 'Continue'}
-            onPress={() => void onContinueDonation()}
-            disabled={donationSubmitting}
-          />
-
-          <Text style={styles.ctaSubtext}>
-            Only {formatNaira(amountNeeded)} needed to complete this request
-          </Text>
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -869,5 +886,23 @@ const styles = StyleSheet.create({
     color: '#2E8BEA',
     textAlign: 'center',
     marginTop: 12,
+  },
+  ownerNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  ownerNoticeText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#1E40AF',
+    fontWeight: '500',
   },
 });

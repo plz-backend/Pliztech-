@@ -70,12 +70,16 @@ export function RequestLiveModal({
               </View>
             </View>
 
-            <Text style={styles.title}>Request Live!</Text>
+            <Text style={styles.title}>Request submitted</Text>
 
             <Text style={styles.subtitle}>
               <Text style={styles.subtitleMuted}>Your request for </Text>
               <Text style={styles.subtitleAmount}>{amountStr}</Text>
-              <Text style={styles.subtitleMuted}> is now visible at the community.</Text>
+              <Text style={styles.subtitleMuted}>
+                {' '}
+                has been received. An admin must approve it before it is published. Once approved, it
+                will appear on your dashboard and in the community.
+              </Text>
             </Text>
 
             <View style={styles.detailCard}>
@@ -94,8 +98,9 @@ export function RequestLiveModal({
             <View style={styles.tipBanner}>
               <Text style={styles.tipEmoji}>💡 </Text>
               <Text style={styles.tipText}>
-                <Text style={styles.tipBold}>Tip: </Text>
-                Share your request to meet more people
+                <Text style={styles.tipBold}>Note: </Text>
+                Until it is approved, your request will not appear publicly. After approval, open your
+                dashboard to view and share it.
               </Text>
             </View>
 

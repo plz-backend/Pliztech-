@@ -46,9 +46,9 @@ export default function Onboarding1Screen() {
           </Text>
           <Text
             style={styles.body}
-            accessibilityLabel="Pliz connects people who need a little help with those who can give it. Simple, direct and human"
+            accessibilityLabel="Plz connects people who need a little help with those who can give it. Simple, direct and human"
           >
-            Pliz connects people who need a little help with those who can give it. Simple, direct
+            Plz connects people who need a little help with those who can give it. Simple, direct
             and human
           </Text>
 

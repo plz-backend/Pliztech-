@@ -1,11 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
 import { Screen } from '@/components/Screen';
+import {
+  loadAccountSettings,
+  saveAccountSettings,
+  type AccountSettingsState,
+} from '@/lib/preferences/account-settings-storage';
 
 const ACCENT_BLUE = '#2E8BEA';
 const BORDER_GRAY = '#E5E7EB';
@@ -91,20 +96,41 @@ function SettingsRow({
 }
 
 export default function AccountSettingsScreen() {
-  const [darkMode, setDarkMode] = useState(false);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [smsNotifications, setSmsNotifications] = useState(false);
+  const [prefs, setPrefs] = useState<AccountSettingsState | null>(null);
+
+  useEffect(() => {
+    void loadAccountSettings().then(setPrefs);
+  }, []);
+
+  const persist = useCallback(async (next: AccountSettingsState) => {
+    setPrefs(next);
+    await saveAccountSettings(next);
+  }, []);
+
+  const darkMode = prefs?.darkMode ?? false;
+  const emailNotifications = prefs?.emailNotifications ?? true;
+  const smsNotifications = prefs?.smsNotifications ?? false;
 
   const handleLanguage = () => {
-    // TODO: Navigate to language selection
+    Alert.alert(
+      'Language',
+      'Additional languages will be available in a future update. The app currently follows your device language where supported.'
+    );
   };
 
   const handleExportData = () => {
-    // TODO: Export data flow
+    Alert.alert(
+      'Export my data',
+      'A full data export is processed on the server. Contact support from your profile email with the subject “Data export” and we will send your package when the export API is enabled for your account.'
+    );
   };
 
   const handleDeleteAccount = () => {
-    // TODO: Delete account flow with confirmation
+    Alert.alert(
+      'Delete account',
+      'Permanent account deletion must be confirmed by support to protect donors and recipients. Contact support to request deletion. This screen will call the delete API when it is available.',
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -134,7 +160,7 @@ export default function AccountSettingsScreen() {
           title="Dark Mode"
           showToggle
           toggleValue={darkMode}
-          onToggleChange={setDarkMode}
+          onToggleChange={(v) => void persist({ darkMode: v, emailNotifications, smsNotifications })}
           isLast
         />
       </SettingsSection>
@@ -146,7 +172,7 @@ export default function AccountSettingsScreen() {
           subtitle="Receive updates via email"
           showToggle
           toggleValue={emailNotifications}
-          onToggleChange={setEmailNotifications}
+          onToggleChange={(v) => void persist({ darkMode, emailNotifications: v, smsNotifications })}
           isLast={false}
         />
         <SettingsRow
@@ -155,7 +181,7 @@ export default function AccountSettingsScreen() {
           subtitle="Get text message alerts"
           showToggle
           toggleValue={smsNotifications}
-          onToggleChange={setSmsNotifications}
+          onToggleChange={(v) => void persist({ darkMode, emailNotifications, smsNotifications: v })}
           isLast
         />
       </SettingsSection>

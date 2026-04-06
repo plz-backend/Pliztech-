@@ -146,7 +146,7 @@ export default function ResetPasswordScreen() {
         <View style={styles.logoSection}>
           <Image source={LOGO} style={styles.logo} contentFit="contain" />
         </View>
-        <Text style={styles.appName}>Pliz</Text>
+        <Text style={styles.appName}>Plz</Text>
         <Text style={styles.welcomeTitle}>Set a new password</Text>
         <Text style={styles.welcomeSubtitle}>
           Choose a strong password you haven&apos;t used before on this account.

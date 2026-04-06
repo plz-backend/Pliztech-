@@ -19,6 +19,10 @@ export async function completeProfile(
     firstName: body.firstName.trim(),
     lastName: body.lastName.trim(),
     phoneNumber: body.phoneNumber.trim(),
+    dateOfBirth: body.dateOfBirth.trim(),
+    gender: body.gender,
+    state: body.state.trim(),
+    city: body.city.trim(),
     agreeToTerms: body.agreeToTerms,
     isAnonymous: body.isAnonymous ?? false,
   };
@@ -31,6 +35,11 @@ export async function completeProfile(
   const display = body.displayName?.trim();
   if (display) {
     payload.displayName = display;
+  }
+
+  const addr = body.address?.trim();
+  if (addr) {
+    payload.address = addr;
   }
 
   const res = await fetch(apiUrl('/api/auth/profile/complete'), {

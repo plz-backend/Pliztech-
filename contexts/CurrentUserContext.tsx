@@ -41,6 +41,70 @@ export function displayRoleLabel(role: string): string {
   }
 }
 
+/**
+ * Member-facing role on profile: "Beginner" until first donation, then "Community Supporter".
+ * Admins keep admin labels.
+ */
+export function displayMemberRoleLabel(user: MeUser | null): string {
+  if (!user) return 'Member';
+  if (user.role === 'admin' || user.role === 'superadmin') {
+    return displayRoleLabel(user.role);
+  }
+  const donated = Number(user.stats?.totalDonated) || 0;
+  return donated > 0 ? 'Community Supporter' : 'Beginner';
+}
+
+/** Govt ID verified (NIN / passport) — only when API sends `verification.documentVerified`. */
+export function isDocumentVerified(user: MeUser | null): boolean {
+  return Boolean(user?.verification?.documentVerified);
+}
+
+/**
+ * Whether user may request more than ₦10k (gov ID + at least 2 successful begs or any donation).
+ * Matches product rule approximately until GET /me includes explicit flags.
+ */
+export function canRequestHighAmountBeg(user: MeUser | null): boolean {
+  if (!user) return false;
+  if (!isDocumentVerified(user)) return false;
+  const stats = user.stats;
+  const reqs = stats?.requestsCount ?? 0;
+  const donated = Number(stats?.totalDonated) || 0;
+  return reqs >= 2 || donated > 0;
+}
+
+/** Header name + email respecting anonymous mode (hides PII). */
+export function displayProfileHeader(user: MeUser | null): {
+  name: string;
+  email: string;
+  initials: string;
+  maskAvatar: boolean;
+} {
+  if (!user?.profile) {
+    return {
+      name: user?.username?.trim() || 'Member',
+      email: user?.email ?? '',
+      initials: initialsFromDisplayName(user?.username ?? '?'),
+      maskAvatar: false,
+    };
+  }
+  if (user.profile.isAnonymous) {
+    const dn = user.profile.displayName?.trim() || 'Anonymous';
+    return {
+      name: dn,
+      email: '',
+      initials: '?',
+      maskAvatar: true,
+    };
+  }
+  const full = displayFullName(user);
+  return {
+    name: full,
+    email: user.email ?? '',
+    initials: initialsFromDisplayName(full),
+    maskAvatar: false,
+  };
+}
+
 /** Throttle for refetching `/me` when tab screens gain focus (shared with Home / Profile). */
 export const CURRENT_USER_FOCUS_REFETCH_STALE_MS = 2 * 60 * 1000;
 

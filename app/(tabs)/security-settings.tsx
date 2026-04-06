@@ -112,7 +112,7 @@ function SecurityRow({
 function SecurityTipsBanner() {
   const tips = [
     'Never share your password or PIN with anyone',
-    'Pliz will never ask for your password via email',
+    'Plz will never ask for your password via email',
     'Enable 2FA for extra protection',
   ];
   return (

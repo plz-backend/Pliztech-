@@ -11,7 +11,7 @@ import { TrendingRequests } from '@/components/home/TrendingRequests';
 import {
   CURRENT_USER_FOCUS_REFETCH_STALE_MS,
   displayFirstName,
-  displayRoleLabel,
+  displayMemberRoleLabel,
   useCurrentUser,
 } from '@/contexts/CurrentUserContext';
 
@@ -160,7 +160,7 @@ export default function HomeScreen() {
   );
 
   const firstName = isLoading && !user ? '…' : displayFirstName(user) || 'Guest';
-  const role = user ? displayRoleLabel(user.role) : isLoading ? '…' : 'Member';
+  const role = user ? displayMemberRoleLabel(user) : isLoading ? '…' : 'Member';
 
   const impactStats = user?.stats;
   const totalGiven = Math.round(Number(impactStats?.totalDonated) || 0);
@@ -192,6 +192,10 @@ export default function HomeScreen() {
 
   const onSeeAllContributions = () => {
     router.push('/(tabs)/(main)/activity');
+  };
+
+  const onCommunityStories = () => {
+    router.push('/(tabs)/stories-feed' as import('expo-router').Href);
   };
 
   const onNotifications = () => {
@@ -233,6 +237,7 @@ export default function HomeScreen() {
           loading={recentLoading}
           emptyMessage={recentEmptyMessage}
           onSeeAll={onSeeAllContributions}
+          onCommunityStories={onCommunityStories}
         />
       </ScrollView>
     </View>

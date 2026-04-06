@@ -19,18 +19,20 @@ export type BegApiCategory =
   | 'emergency'
   | 'other';
 
+export type BegExpiryHours = 24 | 72 | 168;
+
 export type CreateBegBody = {
-  title: string;
   description: string;
   category: BegApiCategory;
   amountRequested: number;
+  /** 24, 72, or 168 (7 days) — sent when backend controller forwards to BegService */
+  expiryHours?: BegExpiryHours;
   mediaType?: 'video' | 'audio' | 'text';
   mediaUrl?: string;
 };
 
 export type CreatedBeg = {
   id: string;
-  title: string;
   description: string | null;
   categoryId: string;
   amountRequested: number;
@@ -59,18 +61,12 @@ export function uiCategoryToApiCategory(uiCategoryId: string): BegApiCategory {
   return UI_CATEGORY_TO_API[uiCategoryId] ?? 'other';
 }
 
-/** Backend BegService enforces title ≤ 25 characters. */
-export function normalizeBegTitleForApi(title: string): string {
-  const t = title.trim().replace(/\s+/g, ' ');
-  return t.slice(0, 25);
-}
-
-/** Backend: max 30 words, 500 characters. */
+/** Backend: max 40 words, 300 characters (BegService). */
 export function clampBegDescriptionForApi(description: string): string {
   const trimmed = description.trim().replace(/\s+/g, ' ');
-  const words = trimmed.split(' ').filter(Boolean).slice(0, 30);
+  const words = trimmed.split(' ').filter(Boolean).slice(0, 40);
   const joined = words.join(' ');
-  return joined.length > 500 ? joined.slice(0, 500) : joined;
+  return joined.length > 300 ? joined.slice(0, 300) : joined;
 }
 
 /**
@@ -88,10 +84,10 @@ export async function createBeg(
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
-      title: body.title,
       description: body.description,
       category: body.category,
       amountRequested: body.amountRequested,
+      ...(body.expiryHours != null ? { expiryHours: body.expiryHours } : {}),
       mediaType: body.mediaType ?? 'text',
       ...(body.mediaUrl ? { mediaUrl: body.mediaUrl } : {}),
     }),
@@ -135,7 +131,8 @@ export type BegFeedItem = {
   isAnonymous?: boolean;
   firstName?: string;
   lastName?: string;
-  title: string;
+  /** Legacy — newer begs may omit title */
+  title?: string;
   description: string | null;
   category: {
     id: string;
@@ -317,7 +314,7 @@ function categoryIconForBeg(beg: BegFeedItem): keyof typeof Ionicons.glyphMap {
 export function begFeedItemToActivityRequest(beg: BegFeedItem): ActivityRequest {
   return {
     id: beg.id,
-    title: beg.title.trim() || 'Request',
+    title: (beg.title ?? '').trim() || 'Request',
     timeAgo: formatBegCreatedTimeAgo(beg.createdAt),
     status: mapBegStatusToActivityStatus(beg),
     amount: Math.round(Number(beg.amountRequested) || 0),
@@ -344,7 +341,10 @@ export function summarizeActivityRequests(begs: BegFeedItem[]): {
 
 /** Listing label: "First Last", or fallbacks when profile names are missing. */
 export function feedBegListingName(beg: BegFeedItem): string {
-  if (beg.isAnonymous) return 'Anonymous';
+  if (beg.isAnonymous) {
+    const dn = beg.displayName?.trim();
+    return dn || 'Anonymous';
+  }
   const first = beg.firstName?.trim() ?? '';
   const last = beg.lastName?.trim() ?? '';
   const combined = `${first} ${last}`.trim();
@@ -365,6 +365,20 @@ export function feedBegAvatarLetter(beg: BegFeedItem): string {
   return ch ? ch.toUpperCase() : '?';
 }
 
+/** Human-readable time until expiry for dashboard cards. */
+export function formatBegExpiresLabel(iso: string | undefined): string {
+  if (!iso) return '—';
+  const end = new Date(iso).getTime();
+  if (Number.isNaN(end)) return '—';
+  const ms = end - Date.now();
+  if (ms <= 0) return 'Expired';
+  const hours = Math.ceil(ms / 3600000);
+  if (hours < 24) return `${hours}h left`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return '1 day left';
+  return `${days} days left`;
+}
+
 /** Map feed API item to browse card model. */
 export function feedBegToBrowseRequest(beg: BegFeedItem): BrowseRequest {
   const name = feedBegListingName(beg);
@@ -373,7 +387,7 @@ export function feedBegToBrowseRequest(beg: BegFeedItem): BrowseRequest {
   const timeLeft = tr === 'Expired' ? 'Expired' : `${tr} left`;
   const text =
     beg.description?.trim() ||
-    beg.title.trim() ||
+    beg.title?.trim() ||
     'Request';
 
   const raised = Math.round(Number(beg.amountRaised) || 0);
@@ -426,7 +440,7 @@ export function feedBegToTrendingRequest(beg: BegFeedItem): TrendingRequest {
     (goal > 0 ? Math.round((raised / goal) * 100) : 0);
   const text =
     beg.description?.trim() ||
-    beg.title.trim() ||
+    beg.title?.trim() ||
     'Request';
 
   return {
@@ -435,6 +449,7 @@ export function feedBegToTrendingRequest(beg: BegFeedItem): TrendingRequest {
     initial,
     avatarColor: avatarColorFromSeed(beg.userId || beg.id),
     timeAgo: formatBegCreatedTimeAgo(beg.createdAt),
+    expiresInLabel: formatBegExpiresLabel(beg.expiresAt),
     text,
     raised,
     goal,
@@ -512,7 +527,7 @@ export function begFeedItemToRequestDetail(beg: BegFeedItem): RequestDetail {
     (goal > 0 ? Math.round((raised / goal) * 100) : 0);
   const text =
     beg.description?.trim() ||
-    beg.title.trim() ||
+    beg.title?.trim() ||
     'Request';
 
   const titleLine = beg.title?.trim() ?? '';
@@ -529,6 +544,7 @@ export function begFeedItemToRequestDetail(beg: BegFeedItem): RequestDetail {
 
   return {
     id: beg.id,
+    ownerUserId: beg.userId,
     name,
     initial,
     avatarColor: avatarColorFromSeed(beg.userId || beg.id),

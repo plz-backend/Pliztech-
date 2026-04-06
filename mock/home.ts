@@ -22,6 +22,8 @@ export type TrendingRequest = {
   initial: string;
   avatarColor: string;
   timeAgo: string;
+  /** Time until request expires (from API `expiresAt`). */
+  expiresInLabel?: string;
   text: string;
   raised: number;
   goal: number;

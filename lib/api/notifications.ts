@@ -2,7 +2,7 @@ import { apiUrl } from '@/constants/api';
 
 import { PlizApiError } from './types';
 
-/** Notification `type` values from the Pliz API / Prisma. */
+/** Notification `type` values from the Plz API / Prisma. */
 export type NotificationApiType =
   | 'beg_funded'
   | 'donation_received'

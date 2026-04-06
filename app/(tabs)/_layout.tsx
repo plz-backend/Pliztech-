@@ -48,6 +48,9 @@ export default function TabLayout() {
         options={{ headerShown: false, presentation: 'card' }}
       />
       <Stack.Screen name="logout" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="account-settings" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="stories-feed" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="share-story" options={{ headerShown: false, presentation: 'card' }} />
     </Stack>
   );
 }

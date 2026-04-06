@@ -10,10 +10,15 @@ function formatNaira(amount: number) {
 export type ProfileSummaryCardProps = {
   fullName: string;
   email: string;
-  verified: boolean;
+  /** Email verified — shows amber hint when false */
+  emailVerified: boolean;
+  /** Govt ID / NIN verification — green “Verified” badge only when true */
+  govIdVerified: boolean;
   roleLabel: string;
   avatarColor: string;
   initials: string;
+  /** Hide photo / use neutral avatar (anonymous mode) */
+  maskAvatar?: boolean;
   /** Total amount donated (₦) */
   given?: number;
   /** Number of distinct people (request owners) you have donated to */
@@ -26,10 +31,12 @@ export type ProfileSummaryCardProps = {
 export function ProfileSummaryCard({
   fullName,
   email,
-  verified,
+  emailVerified,
+  govIdVerified,
   roleLabel,
   avatarColor,
   initials,
+  maskAvatar = false,
   given = 0,
   helped = 0,
   requests = 0,
@@ -38,11 +45,16 @@ export function ProfileSummaryCard({
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
-        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: maskAvatar ? '#9CA3AF' : avatarColor },
+          ]}
+        >
           {isLoading && !fullName ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.avatarText}>{initials}</Text>
+            <Text style={styles.avatarText}>{maskAvatar ? '?' : initials}</Text>
           )}
         </View>
         <View style={styles.info}>
@@ -50,21 +62,24 @@ export function ProfileSummaryCard({
             <Text style={styles.name} numberOfLines={2}>
               {isLoading && !fullName ? 'Loading…' : fullName}
             </Text>
-            {!isLoading && fullName ? <View style={styles.onlineDot} /> : null}
+            {!isLoading && fullName && !maskAvatar ? <View style={styles.onlineDot} /> : null}
             <View style={styles.roleBadge}>
               <Ionicons name="heart" size={12} color="#FFFFFF" />
               <Text style={styles.roleText}>{roleLabel}</Text>
             </View>
           </View>
-          <Text style={styles.email} numberOfLines={1}>
-            {isLoading && !email ? '…' : email}
-          </Text>
-          {verified ? (
+          {email ? (
+            <Text style={styles.email} numberOfLines={1}>
+              {isLoading ? '…' : email}
+            </Text>
+          ) : null}
+          {govIdVerified ? (
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark" size={12} color="#FFFFFF" />
               <Text style={styles.verifiedText}>Verified</Text>
             </View>
-          ) : !isLoading && email ? (
+          ) : null}
+          {!emailVerified && !isLoading && email ? (
             <Text style={styles.unverifiedHint}>Email not verified</Text>
           ) : null}
         </View>

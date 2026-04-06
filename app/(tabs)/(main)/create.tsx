@@ -24,9 +24,13 @@ import { FormTextArea } from '@/components/FormTextArea';
 import { Screen } from '@/components/Screen';
 import { categoryEmojiForId, REQUEST_CATEGORIES } from '@/constants/categories';
 import {
+  canRequestHighAmountBeg,
+  useCurrentUser,
+} from '@/contexts/CurrentUserContext';
+import {
   clampBegDescriptionForApi,
   createBeg,
-  normalizeBegTitleForApi,
+  type BegExpiryHours,
   uiCategoryToApiCategory,
 } from '@/lib/api/beg';
 import { PlizApiError } from '@/lib/api/types';
@@ -34,21 +38,16 @@ import { getAccessToken } from '@/lib/auth/access-token';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
-const BEG_TITLE_MAX = 25;
+const MAX_DESC_WORDS = 40;
 
 const createRequestSchema = z.object({
   categoryId: z.string().min(1, 'Please select a category'),
-  title: z
-    .string()
-    .min(1, 'Add a short title for your request')
-    .max(BEG_TITLE_MAX, `Title must be ${BEG_TITLE_MAX} characters or less`)
-    .refine((val) => val.trim().length > 0, 'Add a short title for your request'),
   description: z
     .string()
     .min(1, 'Please describe your need')
     .refine(
-      (val) => val.trim().split(/\s+/).filter(Boolean).length <= 30,
-      'Maximum 30 words (server limit)'
+      (val) => val.trim().split(/\s+/).filter(Boolean).length <= MAX_DESC_WORDS,
+      `Maximum ${MAX_DESC_WORDS} words`
     ),
   amount: z
     .string()
@@ -60,7 +59,7 @@ const createRequestSchema = z.object({
       },
       'Minimum amount is ₦100'
     ),
-  expiryHours: z.enum(['24', '48', '72']),
+  expiryHours: z.enum(['24', '72', '168']),
   showName: z.boolean(),
 });
 
@@ -68,7 +67,6 @@ type CreateRequestFormData = z.infer<typeof createRequestSchema>;
 
 const DEFAULT_CREATE_VALUES: CreateRequestFormData = {
   categoryId: '',
-  title: '',
   description: '',
   amount: '',
   expiryHours: '24',
@@ -84,8 +82,8 @@ const COLORS = {
 
 const EXPIRY_OPTIONS = [
   { value: '24' as const, label: '24 hours' },
-  { value: '48' as const, label: '48 hours' },
   { value: '72' as const, label: '72 hours' },
+  { value: '168' as const, label: '7 days' },
 ];
 
 function countWords(text: string): number {
@@ -93,6 +91,7 @@ function countWords(text: string): number {
 }
 
 export default function CreateScreen() {
+  const { user } = useCurrentUser();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -118,9 +117,7 @@ export default function CreateScreen() {
   });
 
   const description = watch('description');
-  const titleValue = watch('title');
   const wordCount = countWords(description ?? '');
-  const titleCharCount = (titleValue ?? '').length;
 
   const onContinue = async (data: CreateRequestFormData) => {
     if (isSubmitting) return;
@@ -133,9 +130,12 @@ export default function CreateScreen() {
       return;
     }
 
-    const title = normalizeBegTitleForApi(data.title);
-    if (!title) {
-      Alert.alert('Title required', 'Please enter a short title for your request.');
+    const amountNum = Number(data.amount.replace(/,/g, ''));
+    if (amountNum > 10_000 && !canRequestHighAmountBeg(user)) {
+      Alert.alert(
+        'Amount above ₦10,000',
+        'To request more than ₦10,000 you need to verify your identity (NIN or government ID) and have at least two successful help requests or a donation on record. Complete verification in your profile when available.'
+      );
       return;
     }
 
@@ -169,19 +169,15 @@ export default function CreateScreen() {
 
     const amountRequested = Number(data.amount.replace(/,/g, ''));
     const descriptionForApi = clampBegDescriptionForApi(data.description);
-    const title = normalizeBegTitleForApi(data.title);
-    if (!title) {
-      Alert.alert('Title required', 'Please enter a short title for your request.');
-      return;
-    }
+    const expiryHours = Number(data.expiryHours) as BegExpiryHours;
 
     setIsSubmitting(true);
     try {
       const { beg } = await createBeg(token, {
-        title,
         description: descriptionForApi,
         category: uiCategoryToApiCategory(data.categoryId),
         amountRequested,
+        expiryHours,
         mediaType: 'text',
       });
 
@@ -254,7 +250,6 @@ export default function CreateScreen() {
           onConfirm={onConfirmSubmit}
           categoryLabel={pendingCategory.label}
           categoryIcon={pendingCategory.icon}
-          title={pendingSubmit.title}
           description={pendingSubmit.description}
           amountRequested={pendingAmount}
           expiryLabel={pendingExpiryLabel}
@@ -294,7 +289,10 @@ export default function CreateScreen() {
             Tell us what we need. Keep it simple and honest
           </Text>
 
-          <RequestLimitAlert limit="₦10,000" />
+          <RequestLimitAlert
+            limit="₦10,000"
+            verifyMessage="Verify with NIN or government ID and complete two successful requests or a donation to request more."
+          />
 
           <Text style={styles.sectionTitle}>Select a Category</Text>
           <View style={styles.categoryGrid}>
@@ -317,38 +315,17 @@ export default function CreateScreen() {
 
           <Controller
             control={control}
-            name="title"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <FormTextArea
-                variant="single"
-                label="Short title"
-                placeholder="e.g. Transport to new job"
-                value={value}
-                onChangeText={(t) => onChange(t.slice(0, BEG_TITLE_MAX))}
-                onBlur={onBlur}
-                maxLength={BEG_TITLE_MAX}
-                error={errors.title?.message}
-                hint="Shown on the feed (max 25 characters)."
-                wordCount={{ current: titleCharCount, max: BEG_TITLE_MAX }}
-                countUnit="characters"
-                autoCapitalize="sentences"
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
             name="description"
             render={({ field: { onChange, onBlur, value } }) => (
               <FormTextArea
-                label="Briefly Describe your need"
-                placeholder="Be specific but brief. E.g., 'I need help with transport fare to get to my new job this week.'"
+                label="Briefly describe your need"
+                placeholder="Be specific but brief (max 40 words)."
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                wordCount={{ current: wordCount, max: 30 }}
+                wordCount={{ current: wordCount, max: MAX_DESC_WORDS }}
                 error={errors.description?.message}
-                hint="No editing after submission. No images or attachments allowed."
+                hint="No title on the feed — only this description. No editing after submission."
                 maxLength={300}
               />
             )}

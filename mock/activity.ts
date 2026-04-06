@@ -133,7 +133,7 @@ export const MOCK_GIVING_SUMMARY = {
 export const MOCK_COMMUNITY_STORIES = [
   {
     id: 's1',
-    text: "When my car broke down unexpectedly, I didn't know how I'd get to work. Within 24 hours, the Pliz community helped me cover the cost of repairs.",
+    text: "When my car broke down unexpectedly, I didn't know how I'd get to work. Within 24 hours, the Plz community helped me cover the cost of repairs.",
     authorName: 'Sarah M',
     authorInitial: 'S',
     authorColor: '#2E8BEA',
@@ -151,7 +151,7 @@ export const MOCK_COMMUNITY_STORIES = [
   },
   {
     id: 's3',
-    text: "Helping others through Pliz has been incredibly rewarding. Knowing my contribution made a real difference in someone's life keeps me coming back.",
+    text: "Helping others through Plz has been incredibly rewarding. Knowing my contribution made a real difference in someone's life keeps me coming back.",
     authorName: 'Amina K',
     authorInitial: 'A',
     authorColor: '#7C3AED',

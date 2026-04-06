@@ -24,11 +24,11 @@ export type ConfirmRequestModalProps = {
   /** Category label e.g. "Work & Hustle Support" */
   categoryLabel: string;
   categoryIcon: keyof typeof Ionicons.glyphMap;
-  /** Short title shown on the feed */
-  title: string;
   description: string;
   amountRequested: number;
   platformFeePercent?: number;
+  /** VAT on platform fee (government levy), shown as info line */
+  vatGovPercent?: number;
   /** Shown under “You’ll receive”, e.g. "48 hours" */
   expiryLabel: string;
   submitting?: boolean;
@@ -40,16 +40,17 @@ export function ConfirmRequestModal({
   onConfirm,
   categoryLabel,
   categoryIcon,
-  title,
   description,
   amountRequested,
   platformFeePercent = 5,
+  vatGovPercent = 7.5,
   expiryLabel,
   submitting = false,
 }: ConfirmRequestModalProps) {
   const insets = useSafeAreaInsets();
   const fee = Math.round((amountRequested * platformFeePercent) / 100);
-  const receive = Math.max(0, amountRequested - fee);
+  const vatOnFee = Math.round((fee * vatGovPercent) / 100);
+  const receive = Math.max(0, amountRequested - fee - vatOnFee);
 
   return (
     <Modal
@@ -92,7 +93,6 @@ export function ConfirmRequestModal({
                 <Ionicons name={categoryIcon} size={20} color="#6B7280" />
                 <Text style={styles.categoryTitle}>{categoryLabel}</Text>
               </View>
-              <Text style={styles.requestTitle}>{title.trim()}</Text>
               <Text style={styles.description}>{description.trim()}</Text>
 
               <View style={styles.divider} />
@@ -107,6 +107,10 @@ export function ConfirmRequestModal({
                   <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
                 </View>
                 <Text style={styles.rowValueMuted}>-{formatNaira(fee)}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>VAT (govt) ({vatGovPercent}% of fee)</Text>
+                <Text style={styles.rowValueMuted}>-{formatNaira(vatOnFee)}</Text>
               </View>
 
               <View style={styles.receiveBlock}>

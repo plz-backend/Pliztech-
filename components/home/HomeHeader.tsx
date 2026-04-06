@@ -27,6 +27,7 @@ export function HomeHeader({
   unreadNotificationCount = 0,
 }: HomeHeaderProps) {
   const initial = firstName.charAt(0).toUpperCase();
+  const isBeginnerBadge = role === 'Beginner';
 
   return (
     <View style={styles.row}>
@@ -38,9 +39,18 @@ export function HomeHeader({
           Hi, <Text style={styles.name}>{firstName}</Text>
         </Text>
       </View>
-      <View style={styles.pill}>
-        <Ionicons name="heart" size={12} color="#FFFFFF" style={styles.pillIcon} />
-        <Text style={styles.pillText} numberOfLines={1} ellipsizeMode="tail">
+      <View style={[styles.pill, isBeginnerBadge && styles.pillBeginner]}>
+        <Ionicons
+          name={isBeginnerBadge ? 'school-outline' : 'heart'}
+          size={12}
+          color={isBeginnerBadge ? '#92400E' : '#FFFFFF'}
+          style={styles.pillIcon}
+        />
+        <Text
+          style={[styles.pillText, isBeginnerBadge && styles.pillTextBeginner]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {role}
         </Text>
       </View>
@@ -100,7 +110,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 999,
     marginRight: 8,
-    maxWidth: 110,
+    maxWidth: 120,
+  },
+  pillBeginner: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
   },
   pillIcon: {
     marginRight: 4,
@@ -110,6 +125,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     flexShrink: 1,
+  },
+  pillTextBeginner: {
+    color: '#92400E',
   },
   bellWrap: {
     padding: 4,

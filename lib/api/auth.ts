@@ -5,6 +5,7 @@ import {
   type LoginRequestBody,
   type LoginSuccessData,
   type MeUser,
+  type OAuthLoginSuccessData,
   type SignupRequestBody,
   type SignupSuccessResponse,
   PlizApiError,
@@ -281,6 +282,92 @@ export async function login(body: LoginRequestBody): Promise<LoginSuccessData> {
   }
 
   if (!data.data?.accessToken || !data.data?.refreshToken) {
+    throw new PlizApiError('Unexpected response shape', res.status);
+  }
+
+  return data.data;
+}
+
+/**
+ * POST /api/auth/google — `idToken` from Google Sign-In (audience must match server `GOOGLE_CLIENT_ID`).
+ */
+export async function loginWithGoogle(idToken: string): Promise<OAuthLoginSuccessData> {
+  const res = await fetch(apiUrl('/api/auth/google'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ idToken: idToken.trim() }),
+    credentials: isWebAuthEnvironment() ? 'include' : 'omit',
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    data?: OAuthLoginSuccessData;
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(data.message ?? `Request failed (${res.status})`, res.status);
+  }
+
+  if (!data.data?.accessToken || !data.data?.refreshToken || !data.data?.user) {
+    throw new PlizApiError('Unexpected response shape', res.status);
+  }
+
+  return data.data;
+}
+
+/**
+ * POST /api/auth/apple — `identityToken` from Apple; optional name on first sign-in only.
+ */
+export async function loginWithApple(body: {
+  idToken: string;
+  firstName?: string;
+  lastName?: string;
+}): Promise<OAuthLoginSuccessData> {
+  const payload: Record<string, unknown> = {
+    idToken: body.idToken.trim(),
+  };
+  if (body.firstName?.trim()) payload.firstName = body.firstName.trim();
+  if (body.lastName?.trim()) payload.lastName = body.lastName.trim();
+
+  const res = await fetch(apiUrl('/api/auth/apple'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+    credentials: isWebAuthEnvironment() ? 'include' : 'omit',
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    data?: OAuthLoginSuccessData;
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(data.message ?? `Request failed (${res.status})`, res.status);
+  }
+
+  if (!data.data?.accessToken || !data.data?.refreshToken || !data.data?.user) {
     throw new PlizApiError('Unexpected response shape', res.status);
   }
 

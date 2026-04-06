@@ -56,7 +56,7 @@ export const MOCK_NOTIFICATIONS: NotificationItem[] = [
   },
   {
     id: '6',
-    title: 'Welcome to Pliz',
+    title: 'Welcome to Plz',
     body: "We're glad to have you. Start by exploring request or creating your first one",
     timeAgo: '1 week ago',
     unread: false,

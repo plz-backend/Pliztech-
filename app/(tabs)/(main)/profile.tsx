@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
@@ -12,12 +12,14 @@ import { Screen } from '@/components/Screen';
 import {
   avatarColorFromSeed,
   CURRENT_USER_FOCUS_REFETCH_STALE_MS,
-  displayFullName,
-  displayRoleLabel,
+  displayMemberRoleLabel,
+  displayProfileHeader,
   initialsFromDisplayName,
+  isDocumentVerified,
   useCurrentUser,
 } from '@/contexts/CurrentUserContext';
 import { formatCardBrandLabel, getSavedCards } from '@/lib/api/payment-methods';
+import { updateProfile } from '@/lib/api/profile';
 import { getAccessToken } from '@/lib/auth/access-token';
 import {
   isUnauthorizedSessionError,
@@ -28,6 +30,7 @@ const PAYMENT_CARDS_SUBTITLE_DEFAULT = 'Add or manage your cards';
 
 export default function ProfileScreen() {
   const { user, isLoading, refreshUser, signOut } = useCurrentUser();
+  const [anonToggling, setAnonToggling] = useState(false);
   const lastRefreshRef = useRef<number>(0);
 
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -89,12 +92,13 @@ export default function ProfileScreen() {
     setAnonymousMode(user?.profile?.isAnonymous ?? false);
   }, [user?.profile?.isAnonymous]);
 
-  const fullName = displayFullName(user);
-  const email = user?.email ?? '';
-  const roleLabel = user ? displayRoleLabel(user.role) : 'Member';
+  const header = displayProfileHeader(user);
+  const fullName = header.name;
+  const email = header.email;
+  const roleLabel = displayMemberRoleLabel(user);
   const seed = user?.username ?? user?.email ?? '';
   const avatarColor = seed ? avatarColorFromSeed(seed) : '#2E8BEA';
-  const initials = fullName ? initialsFromDisplayName(fullName) : '?';
+  const initials = header.initials || (fullName ? initialsFromDisplayName(fullName) : '?');
   const showCardLoading = isLoading && !user;
 
   const stats = user?.stats;
@@ -131,10 +135,12 @@ export default function ProfileScreen() {
         <ProfileSummaryCard
           fullName={fullName}
           email={email}
-          verified={user?.isEmailVerified ?? false}
+          emailVerified={user?.isEmailVerified ?? false}
+          govIdVerified={isDocumentVerified(user)}
           roleLabel={roleLabel}
           avatarColor={avatarColor}
           initials={initials}
+          maskAvatar={header.maskAvatar}
           given={givenNaira}
           helped={peopleHelped}
           requests={requestsCount}
@@ -169,11 +175,31 @@ export default function ProfileScreen() {
           <ProfileRow
             icon="sync-outline"
             title="Anonymous Mode"
-            subtitle="Your personal details are hidden"
+            subtitle="Hides your name, photo, and contact on your profile"
             showArrow={false}
             showToggle
             toggleValue={anonymousMode}
-            onToggleChange={setAnonymousMode}
+            onToggleChange={async (next) => {
+              if (anonToggling) return;
+              const token = await getAccessToken();
+              if (!token) {
+                Alert.alert('Sign in required', 'Please log in again to update privacy.');
+                return;
+              }
+              setAnonToggling(true);
+              try {
+                await updateProfile(token, { isAnonymous: next });
+                setAnonymousMode(next);
+                await refreshUser();
+              } catch {
+                Alert.alert(
+                  'Could not update',
+                  'We could not update anonymous mode. Check your connection and try again.'
+                );
+              } finally {
+                setAnonToggling(false);
+              }
+            }}
           />
           <ProfileRow
             icon="card-outline"
@@ -222,7 +248,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
         </Pressable>
 
-        <Text style={styles.version}>Pliz v1.0.0</Text>
+        <Text style={styles.version}>Plz v1.0.0</Text>
       </View>
     </Screen>
   );

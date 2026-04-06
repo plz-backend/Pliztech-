@@ -17,7 +17,7 @@ export interface BrandIconProps {
 export function BrandIcon({
   size = DEFAULT_SIZE,
   color = DEFAULT_COLOR,
-  accessibilityLabel = 'Pliz hand heart icon',
+  accessibilityLabel = 'Plz hand heart icon',
 }: BrandIconProps) {
   const width = size;
   const height = size * VIEWBOX_ASPECT;

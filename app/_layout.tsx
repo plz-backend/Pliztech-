@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -8,6 +9,8 @@ import 'react-native-reanimated';
 import { CurrentUserProvider } from '@/contexts/CurrentUserContext';
 
 import '../global.css';
+
+WebBrowser.maybeCompleteAuthSession();
 
 // GestureHandlerRootView required for react-native-gesture-handler reliability on native (iOS/Android)
 
