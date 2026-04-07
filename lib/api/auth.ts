@@ -500,6 +500,7 @@ export async function getMe(accessToken: string): Promise<MeUser> {
       Accept: 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
+    credentials: isWebAuthEnvironment() ? 'include' : 'omit',
   });
 
   let json: unknown;

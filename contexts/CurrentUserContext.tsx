@@ -214,7 +214,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       let token = await getAccessToken();
-      if (!token && isWebAuthEnvironment()) {
+      if (!token) {
         await tryRefreshAccessToken();
         token = await getAccessToken();
       }

@@ -13,6 +13,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Screen } from '@/components/Screen';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
 
 // -----------------------------------------------------------------------------
 // Constants (no magic numbers)
@@ -46,6 +47,7 @@ const BOUNCE_SPRING = { damping: 10, stiffness: 90 } as const;
 
 export default function SplashScreen() {
   const hasNavigated = useRef(false);
+  const { user, isLoading } = useCurrentUser();
 
   const logoTranslateY = useSharedValue<number>(SPACING.slideUpDistance);
   const fromTranslateX = useSharedValue<number>(-40);
@@ -59,13 +61,23 @@ export default function SplashScreen() {
   }, [logoTranslateY, fromTranslateX]);
 
   useEffect(() => {
+    if (isLoading) return;
+
+    if (user) {
+      if (!hasNavigated.current) {
+        hasNavigated.current = true;
+        router.replace('/(tabs)/(main)' as import('expo-router').Href);
+      }
+      return;
+    }
+
     const t = setTimeout(() => {
       if (hasNavigated.current) return;
       hasNavigated.current = true;
       router.replace(NEXT_ROUTE);
     }, SPLASH_DURATION_MS);
     return () => clearTimeout(t);
-  }, []);
+  }, [user, isLoading]);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: logoTranslateY.value }],

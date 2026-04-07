@@ -6,6 +6,8 @@ import type { RecentContribution } from '@/mock/home';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { isWebAuthEnvironment } from '@/lib/auth/web-auth';
+
 import { formatBegCreatedTimeAgo } from './beg';
 import { PlizApiError } from './types';
 
@@ -84,6 +86,7 @@ export async function verifyDonationByReference(
     res = await fetch(apiUrl(`/api/donations/verify?${params.toString()}`), {
       method: 'GET',
       headers: { Accept: 'application/json' },
+      credentials: isWebAuthEnvironment() ? 'include' : 'omit',
     });
   } catch (err) {
     const hint = err instanceof Error ? err.message : String(err);
