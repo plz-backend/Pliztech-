@@ -1,10 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { Screen } from '@/components/Screen';
 import {
   loadAccountSettings,
@@ -135,18 +135,7 @@ export default function AccountSettingsScreen() {
 
   return (
     <Screen backgroundColor="#F9FAFB" scrollable>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <Text style={styles.title}>Account Settings</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppHeaderTitleRow title="Account Settings" />
 
       <SettingsSection title="Preferences">
         <SettingsRow
@@ -208,26 +197,6 @@ export default function AccountSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  headerSpacer: {
-    width: 40,
-  },
   section: {
     marginBottom: 20,
   },

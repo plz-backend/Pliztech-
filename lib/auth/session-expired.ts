@@ -2,6 +2,7 @@ import { router, type Href } from 'expo-router';
 
 import { PlizApiError } from '@/lib/api/types';
 
+import { getAccessToken } from './access-token';
 import { resetRefreshCooldown, tryRefreshAccessToken } from './refresh-session';
 
 const LOGIN_SESSION_EXPIRED = '/(auth)/login?session=expired' as Href;
@@ -77,4 +78,49 @@ export async function recoverFromUnauthorized(
   })();
 
   return sessionRecoveryPromise;
+}
+
+/**
+ * Returns stored access token, or tries a refresh once when missing (e.g. memory cleared but refresh
+ * cookie / SecureStore still has a refresh token).
+ */
+export async function getAccessTokenOrTryRefresh(): Promise<string | null> {
+  let token = await getAccessToken();
+  if (!token) {
+    const ok = await tryRefreshAccessToken();
+    if (ok) {
+      token = await getAccessToken();
+    }
+  }
+  return token;
+}
+
+/**
+ * Runs an authenticated API call. On 401, attempts refresh once and retries with the new access
+ * token. If there is no token and refresh cannot produce one, throws `PlizApiError` 401.
+ */
+export async function withUnauthorizedRecovery<T>(
+  signOut: () => Promise<void>,
+  request: (accessToken: string) => Promise<T>
+): Promise<T> {
+  let token = await getAccessTokenOrTryRefresh();
+  if (!token) {
+    throw new PlizApiError('Please sign in again.', 401);
+  }
+  try {
+    return await request(token);
+  } catch (e) {
+    if (!isUnauthorizedSessionError(e)) {
+      throw e;
+    }
+    const recovered = await recoverFromUnauthorized(signOut);
+    if (!recovered) {
+      throw e;
+    }
+    token = await getAccessToken();
+    if (!token) {
+      throw e;
+    }
+    return await request(token);
+  }
 }

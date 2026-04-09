@@ -28,10 +28,10 @@ import {
     getBegById,
 } from '@/lib/api/beg';
 import { initializeDonation } from '@/lib/api/donations';
-import { PlizApiError } from '@/lib/api/types';
+import { formatPlizApiErrorForUser } from '@/lib/api/types';
 import { savePendingDonationThankYou } from '@/lib/donation/pending-thank-you';
-import { getAccessToken } from '@/lib/auth/access-token';
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
+import { withUnauthorizedRecovery } from '@/lib/auth/session-expired';
 import type { RequestDetail } from '@/mock/requests';
 import {
     getPlatformFee,
@@ -65,7 +65,7 @@ function formatNaira(amount: number) {
 const REQUEST_DETAIL_MAX_WIDTH = 960;
 
 export default function RequestDetailScreen() {
-  const { user } = useCurrentUser();
+  const { user, signOut } = useCurrentUser();
   const params = useLocalSearchParams<{ id: string }>();
   const id = typeof params.id === 'string' ? params.id : params.id?.[0];
 
@@ -87,13 +87,7 @@ export default function RequestDetailScreen() {
       setRequest(begFeedItemToRequestDetail(beg));
     } catch (e) {
       setRequest(null);
-      setError(
-        e instanceof PlizApiError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : 'Failed to load request'
-      );
+      setError(formatPlizApiErrorForUser(e));
     } finally {
       setLoading(false);
     }
@@ -128,18 +122,6 @@ export default function RequestDetailScreen() {
       return;
     }
 
-    const token = await getAccessToken();
-    if (!token) {
-      Alert.alert('Sign in required', 'Please log in to donate.', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log in',
-          onPress: () => router.push('/(auth)/login'),
-        },
-      ]);
-      return;
-    }
-
     const parsedCustom = parseInt(String(customAmount).replace(/\D/g, ''), 10);
     const rawAmount =
       selectedAmount ?? (Number.isFinite(parsedCustom) ? parsedCustom : 0);
@@ -151,12 +133,14 @@ export default function RequestDetailScreen() {
 
     setDonationSubmitting(true);
     try {
-      const result = await initializeDonation(token, {
-        begId: id,
-        amount: rawAmount,
-        paymentMethod: paymentMethod === 'bank' ? 'bank' : 'card',
-        isAnonymous: !showName,
-      });
+      const result = await withUnauthorizedRecovery(signOut, (token) =>
+        initializeDonation(token, {
+          begId: id,
+          amount: rawAmount,
+          paymentMethod: paymentMethod === 'bank' ? 'bank' : 'card',
+          isAnonymous: !showName,
+        })
+      );
 
       if (result.kind === 'checkout') {
         if (request) {
@@ -191,18 +175,7 @@ export default function RequestDetailScreen() {
         void loadRequest();
       }
     } catch (e) {
-      if (e instanceof PlizApiError) {
-        const detail =
-          e.errors.length > 0
-            ? e.errors.map((x) => x.message).join('\n')
-            : e.message;
-        Alert.alert('Could not start donation', detail);
-      } else {
-        Alert.alert(
-          'Could not start donation',
-          e instanceof Error ? e.message : 'Something went wrong'
-        );
-      }
+      Alert.alert('Could not start donation', formatPlizApiErrorForUser(e));
     } finally {
       setDonationSubmitting(false);
     }
@@ -215,6 +188,7 @@ export default function RequestDetailScreen() {
     showName,
     request,
     loadRequest,
+    signOut,
   ]);
 
   const categoryIcon = useMemo(() => {
@@ -302,10 +276,18 @@ export default function RequestDetailScreen() {
     crowns,
     messages,
     ownerUserId,
+    approved,
+    canDonate: canDonateFromApi,
   } = request;
 
   const isOwner =
     Boolean(user?.id && ownerUserId && user.id === ownerUserId);
+  const isAwaitingApproval = isOwner && approved === false;
+  const visitorCanDonate =
+    canDonateFromApi ??
+    (approved !== false &&
+      timeRemaining !== 'Expired' &&
+      timeRemaining !== 'Pending approval');
 
   const platformFee = getPlatformFee(goal);
   const requesterReceives = getRequestReceives(goal);
@@ -360,6 +342,19 @@ export default function RequestDetailScreen() {
               </View>
             </View>
           </View>
+
+          {isAwaitingApproval ? (
+            <View style={styles.pendingApprovalBanner}>
+              <Ionicons name="hourglass-outline" size={22} color="#B45309" />
+              <View style={styles.pendingApprovalTextWrap}>
+                <Text style={styles.pendingApprovalTitle}>Pending approval</Text>
+                <Text style={styles.pendingApprovalSubtitle}>
+                  Your request isn&apos;t visible to the community yet. We&apos;ll notify you when it&apos;s
+                  approved.
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           <Text style={styles.description}>{fullDescription}</Text>
 
@@ -434,6 +429,15 @@ export default function RequestDetailScreen() {
               <Ionicons name="information-circle-outline" size={22} color="#2E8BEA" />
               <Text style={styles.ownerNoticeText}>
                 You can&apos;t donate to your own request. Share this request so others can contribute.
+              </Text>
+            </View>
+          ) : !visitorCanDonate ? (
+            <View style={styles.closedNotice}>
+              <Ionicons name="lock-closed-outline" size={22} color="#6B7280" />
+              <Text style={styles.closedNoticeText}>
+                {timeRemaining === 'Pending approval'
+                  ? 'This request isn&apos;t open for contributions yet.'
+                  : 'This request is no longer accepting donations.'}
               </Text>
             </View>
           ) : (
@@ -887,6 +891,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
+  pendingApprovalBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  pendingApprovalTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pendingApprovalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  pendingApprovalSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#B45309',
+    fontWeight: '500',
+  },
   ownerNotice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -903,6 +934,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: '#1E40AF',
+    fontWeight: '500',
+  },
+  closedNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  closedNoticeText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#4B5563',
     fontWeight: '500',
   },
 });

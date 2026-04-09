@@ -14,12 +14,13 @@ import {
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { Screen } from '@/components/Screen';
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { createStory } from '@/lib/api/stories';
 import { updateProfile } from '@/lib/api/profile';
-import { PlizApiError } from '@/lib/api/types';
-import { getAccessToken } from '@/lib/auth/access-token';
+import { formatPlizApiErrorForUser } from '@/lib/api/types';
+import { withUnauthorizedRecovery } from '@/lib/auth/session-expired';
 
 const MAX_WORDS = 60;
 
@@ -42,7 +43,7 @@ function countWords(text: string): number {
 
 export default function ShareStoryScreen() {
   const { topic: topicParam } = useLocalSearchParams<{ topic?: string }>();
-  const { user, refreshUser } = useCurrentUser();
+  const { user, refreshUser, signOut } = useCurrentUser();
   const [topic, setTopic] = useState<string>(() => {
     const t = typeof topicParam === 'string' ? topicParam : '';
     return STORY_TOPICS.includes(t as (typeof STORY_TOPICS)[number]) ? t : STORY_TOPICS[0];
@@ -67,31 +68,20 @@ export default function ShareStoryScreen() {
     if (!canSubmit || overLimit) return;
     setSubmitting(true);
     try {
-      const token = await getAccessToken();
-      if (!token) {
-        Alert.alert('Sign in required', 'Please sign in to post a story.');
-        return;
-      }
-
-      if (anonymous !== user?.profile?.isAnonymous) {
-        await updateProfile(token, { isAnonymous: anonymous });
-        await refreshUser();
-      }
-
-      await createStory(token, { content: composedContent });
+      await withUnauthorizedRecovery(signOut, async (token) => {
+        if (anonymous !== user?.profile?.isAnonymous) {
+          await updateProfile(token, { isAnonymous: anonymous });
+          await refreshUser();
+        }
+        await createStory(token, { content: composedContent });
+      });
       Alert.alert(
         'Story submitted',
         'Thank you. Your story will appear in the community after review.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (e) {
-      const msg =
-        e instanceof PlizApiError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : 'Could not submit your story';
-      Alert.alert('Could not submit', msg);
+      Alert.alert('Could not submit', formatPlizApiErrorForUser(e));
     } finally {
       setSubmitting(false);
     }
@@ -99,18 +89,7 @@ export default function ShareStoryScreen() {
 
   return (
     <Screen backgroundColor="#F9FAFB" scrollable>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <Text style={styles.title}>Share your story</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppHeaderTitleRow title="Share your story" />
 
       <Text style={styles.lead}>
         Stories are up to {MAX_WORDS} words. They are reviewed before they appear in the feed.
@@ -193,27 +172,6 @@ export default function ShareStoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 44,
-  },
   lead: {
     fontSize: 14,
     color: '#6B7280',

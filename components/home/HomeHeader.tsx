@@ -1,15 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
+import { HeaderNotificationButton } from '@/components/home/HeaderNotificationButton';
+
 const COLORS = {
   heading: '#1F2937',
-  body: '#6B7280',
-  brandBlue: '#2E8BEA',
   avatarBg: '#374151',
   pillBg: '#2E8BEA',
-  bellBg: '#F3F4F6',
 } as const;
 
 export interface HomeHeaderProps {
@@ -54,16 +53,10 @@ export function HomeHeader({
           {role}
         </Text>
       </View>
-      <Pressable
-        onPress={onNotificationPress}
-        style={styles.bellWrap}
-        accessibilityLabel="Notifications"
-        accessibilityRole="button"
-      >
-        <View style={styles.bellBg}>
-          <Ionicons name="notifications-outline" size={22} color={COLORS.brandBlue} />
-        </View>
-      </Pressable>
+      <HeaderNotificationButton
+        onPress={onNotificationPress ?? (() => {})}
+        unreadCount={unreadNotificationCount}
+      />
     </View>
   );
 }
@@ -128,38 +121,5 @@ const styles = StyleSheet.create({
   },
   pillTextBeginner: {
     color: '#92400E',
-  },
-  bellWrap: {
-    padding: 4,
-  },
-  bellBg: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.bellBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
 });

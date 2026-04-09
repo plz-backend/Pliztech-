@@ -1,12 +1,19 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-export type ActivityRequestStatus = 'funded' | 'active' | 'expired' | 'cancelled';
+export type ActivityRequestStatus =
+  | 'funded'
+  | 'active'
+  | 'pending'
+  | 'expired'
+  | 'cancelled';
 
 /** UI row for Activity → Requests (API-backed or mock). */
 export type ActivityRequest = {
   id: string;
   title: string;
   timeAgo: string;
+  /** From API `expiresAt` — e.g. "2h left", "Expired". */
+  expiresLabel?: string;
   status: ActivityRequestStatus;
   amount: number;
   categoryId: string;

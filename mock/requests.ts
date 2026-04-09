@@ -4,6 +4,10 @@ import type { BrowseRequest, TrendingRequest } from './home';
 export interface RequestDetail extends BrowseRequest {
   /** Beg owner — hide donation UI when same as current user */
   ownerUserId?: string;
+  /** From API; `false` until admin approves. Omitted in legacy/mock → treated as public. */
+  approved?: boolean;
+  /** From API: false when expired, funded, cancelled, or not yet approved. Mock omits → visitor donation allowed if time left. */
+  canDonate?: boolean;
   fullDescription: string;
   timeAgo: string;
   timeRemaining: string;

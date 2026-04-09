@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { Screen } from '@/components/Screen';
 import { ConfirmWithdrawalSummary } from '@/components/withdraw/ConfirmWithdrawalSummary';
 import { FundedWithdrawRequestCard } from '@/components/withdraw/FundedWithdrawRequestCard';
@@ -652,17 +653,12 @@ export default function WithdrawFundsScreen() {
 
   return (
     <Screen backgroundColor={step === 3 ? '#F9FAFB' : '#FFFFFF'}>
-      <View style={[styles.header, { paddingTop: 8 }]}>
-        <Pressable
-          onPress={goBackFromStep2Or3}
-          style={styles.headerBtn}
-          accessibilityLabel={step === 1 ? 'Go back' : 'Go to previous step'}
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Withdraw Funds</Text>
-        <View style={styles.headerBtn} />
+      <View style={{ paddingTop: 8 }}>
+        <AppHeaderTitleRow
+          title="Withdraw Funds"
+          onPressBack={goBackFromStep2Or3}
+          marginBottom={8}
+        />
       </View>
 
       <View style={styles.body}>
@@ -970,23 +966,6 @@ export default function WithdrawFundsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  headerBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#111827',
-  },
   body: {
     flex: 1,
   },

@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -12,8 +13,18 @@ import {
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { Screen } from '@/components/Screen';
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
+import {
+  formatBegExpiresLabel,
+  extendBeg,
+  getExpiringBegs,
+  getMyBegs,
+  type BegExpiryHours,
+  type BegFeedItem,
+  type ExpiringBegApi,
+} from '@/lib/api/beg';
 import {
   getNotifications,
   mapApiNotificationToListItem,
@@ -21,7 +32,7 @@ import {
   markNotificationRead,
   type NotificationListItem,
 } from '@/lib/api/notifications';
-import { PlizApiError } from '@/lib/api/types';
+import { formatPlizApiErrorForUser } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
 import {
   isUnauthorizedSessionError,
@@ -39,6 +50,64 @@ const ICON_MAP: Record<NotificationListItem['icon'], keyof typeof Ionicons.glyph
   'alert-circle': 'alert-circle-outline',
   gift: 'gift-outline',
 };
+
+function ExpiringBegAlertCard({
+  beg,
+  onExtend,
+}: {
+  beg: ExpiringBegApi;
+  onExtend: () => void;
+}) {
+  const ends = formatBegExpiresLabel(beg.expiresAt);
+  const preview = (beg.description ?? 'Your request').trim().slice(0, 72);
+  return (
+    <View style={styles.alertCard}>
+      <View style={styles.alertIconWrap}>
+        <Ionicons name="hourglass-outline" size={22} color="#EA580C" />
+      </View>
+      <View style={styles.alertContent}>
+        <Text style={styles.alertTitle}>Ending soon</Text>
+        <Text style={styles.alertBody} numberOfLines={2}>
+          {preview}
+          {beg.description && beg.description.length > 72 ? '…' : ''}
+        </Text>
+        <Text style={styles.alertMeta}>{ends === 'Expired' ? 'Expired' : `Time left: ${ends}`}</Text>
+        <Pressable
+          style={styles.extendBtn}
+          onPress={onExtend}
+          accessibilityRole="button"
+          accessibilityLabel="Extend request"
+        >
+          <Text style={styles.extendBtnLabel}>Extend</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function ExpiredBegNoticeCard({ beg }: { beg: BegFeedItem }) {
+  const preview = (beg.description ?? 'Your request').trim().slice(0, 72);
+  return (
+    <Pressable
+      style={styles.expiredCard}
+      onPress={() => void navigateToBegDetailOrPastOverlay(beg.id)}
+      accessibilityRole="button"
+    >
+      <View style={styles.alertIconWrapMuted}>
+        <Ionicons name="time-outline" size={22} color="#9CA3AF" />
+      </View>
+      <View style={styles.alertContent}>
+        <Text style={styles.expiredTitle}>Request expired</Text>
+        <Text style={styles.alertBody} numberOfLines={2}>
+          {preview}
+          {beg.description && beg.description.length > 72 ? '…' : ''}
+        </Text>
+        <Text style={styles.alertMeta}>It is no longer visible in the feed. Tap to view.</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+    </Pressable>
+  );
+}
 
 function NotificationRow({
   item,
@@ -77,6 +146,8 @@ export default function NotificationsScreen() {
   const { signOut } = useCurrentUser();
   const [items, setItems] = useState<NotificationListItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [expiringBegs, setExpiringBegs] = useState<ExpiringBegApi[]>([]);
+  const [expiredBegs, setExpiredBegs] = useState<BegFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,11 +165,28 @@ export default function NotificationsScreen() {
         if (!token) {
           setItems([]);
           setUnreadCount(0);
+          setExpiringBegs([]);
+          setExpiredBegs([]);
           return;
         }
-        const result = await getNotifications(token, { page: 1, limit: 50 });
+
+        const [result, expiring, myBegsRes] = await Promise.all([
+          getNotifications(token, { page: 1, limit: 50 }),
+          getExpiringBegs(token).catch(() => [] as ExpiringBegApi[]),
+          getMyBegs(token, { page: 1, limit: 100 }).catch(() => ({ begs: [] as BegFeedItem[] })),
+        ]);
+
         setItems(result.notifications.map(mapApiNotificationToListItem));
         setUnreadCount(result.unreadCount);
+        setExpiringBegs(expiring);
+        const expired = myBegsRes.begs
+          .filter((b) => b.status === 'expired')
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          .slice(0, 8);
+        setExpiredBegs(expired);
       } catch (e) {
         if (isUnauthorizedSessionError(e) && !retryAfterRefresh) {
           const recovered = await recoverFromUnauthorized(signOut);
@@ -108,13 +196,7 @@ export default function NotificationsScreen() {
           }
           return;
         }
-        const msg =
-          e instanceof PlizApiError
-            ? e.message
-            : e instanceof Error
-              ? e.message
-              : 'Could not load notifications';
-        setError(msg);
+        setError(formatPlizApiErrorForUser(e));
         if (!background) {
           setItems([]);
         }
@@ -126,6 +208,65 @@ export default function NotificationsScreen() {
     },
     [signOut]
   );
+
+  const promptExtendBeg = useCallback(
+    (beg: ExpiringBegApi) => {
+      const opts = beg.availableExtensions;
+      if (!opts.length) {
+        Alert.alert(
+          'Cannot extend',
+          'No extension options are available. You may already be on the longest duration.'
+        );
+        return;
+      }
+      const buttons = opts.slice(0, 3).map((o) => ({
+        text: `Extend to ${o.label}`,
+        onPress: () => {
+          void (async () => {
+            try {
+              const token = await getAccessToken();
+              if (!token) return;
+              await extendBeg(token, beg.id, o.hours as BegExpiryHours);
+              Alert.alert('Extended', 'Your request will stay visible longer.');
+              await loadNotifications({ background: true });
+            } catch (err) {
+              Alert.alert('Could not extend', formatPlizApiErrorForUser(err));
+            }
+          })();
+        },
+      }));
+      Alert.alert(
+        'Extend request',
+        'Choose how much longer your request should stay live in the community.',
+        [...buttons, { text: 'Cancel', style: 'cancel' as const }]
+      );
+    },
+    [loadNotifications]
+  );
+
+  const listHeader = useMemo(() => {
+    if (expiringBegs.length === 0 && expiredBegs.length === 0) return null;
+    return (
+      <View style={styles.listHeaderWrap}>
+        {expiringBegs.length > 0 ? (
+          <>
+            <Text style={styles.sectionTitle}>Ending soon</Text>
+            {expiringBegs.map((b) => (
+              <ExpiringBegAlertCard key={b.id} beg={b} onExtend={() => promptExtendBeg(b)} />
+            ))}
+          </>
+        ) : null}
+        {expiredBegs.length > 0 ? (
+          <>
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Expired requests</Text>
+            {expiredBegs.map((b) => (
+              <ExpiredBegNoticeCard key={b.id} beg={b} />
+            ))}
+          </>
+        ) : null}
+      </View>
+    );
+  }, [expiringBegs, expiredBegs, promptExtendBeg]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -158,7 +299,7 @@ export default function NotificationsScreen() {
         }
         return;
       }
-      setError(e instanceof PlizApiError ? e.message : 'Could not mark all as read');
+      setError(formatPlizApiErrorForUser(e));
     }
   };
 
@@ -187,34 +328,25 @@ export default function NotificationsScreen() {
 
   return (
     <Screen backgroundColor="#FFFFFF">
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          {unreadCount > 0 ? (
-            <Text style={styles.unreadCount}>{unreadCount} unread</Text>
-          ) : null}
-        </View>
-        {unreadCount > 0 ? (
-          <Pressable
-            style={styles.markAllButton}
-            onPress={() => void handleMarkAllRead()}
-            accessibilityLabel="Mark all read"
-            accessibilityRole="button"
-          >
-            <Text style={styles.markAllText}>Mark all read</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
-      </View>
+      <AppHeaderTitleRow
+        title="Notifications"
+        subtitle={unreadCount > 0 ? `${unreadCount} unread` : undefined}
+        showNotification={false}
+        rightSlot={
+          unreadCount > 0 ? (
+            <Pressable
+              style={styles.markAllButton}
+              onPress={() => void handleMarkAllRead()}
+              accessibilityLabel="Mark all read"
+              accessibilityRole="button"
+            >
+              <Text style={styles.markAllText}>Mark all read</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )
+        }
+      />
 
       {loading && items.length === 0 ? (
         <View style={styles.centered}>
@@ -235,24 +367,32 @@ export default function NotificationsScreen() {
       <FlatList
         data={items}
         keyExtractor={(it) => it.id}
+        ListHeaderComponent={listHeader}
         renderItem={({ item }) => (
           <NotificationRow item={item} onPress={() => void handleRowPress(item)} />
         )}
         contentContainerStyle={[
           styles.listContent,
-          items.length === 0 && !loading ? styles.listEmpty : null,
+          items.length === 0 && !loading && !listHeader ? styles.listEmpty : null,
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={ACCENT_BLUE} />
         }
         ListEmptyComponent={
-          !loading ? (
+          !loading && !listHeader ? (
             <View style={styles.emptyWrap}>
               <Ionicons name="notifications-off-outline" size={48} color="#D1D5DB" />
               <Text style={styles.emptyTitle}>No notifications yet</Text>
               <Text style={styles.emptySubtitle}>
                 When someone supports you or sends a message, it will show up here.
+              </Text>
+            </View>
+          ) : !loading && listHeader && items.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptySubtitle}>
+                No other notifications yet. Updates about donations and messages appear below when
+                available.
               </Text>
             </View>
           ) : null
@@ -263,31 +403,6 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  unreadCount: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
-  },
   markAllButton: {
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -299,6 +414,94 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 80,
+  },
+  listHeaderWrap: {
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 10,
+  },
+  sectionTitleSpaced: {
+    marginTop: 20,
+  },
+  alertCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF7ED',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  expiredCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  alertIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFEDD5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  alertIconWrapMuted: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  alertContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  alertTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#9A3412',
+    marginBottom: 4,
+  },
+  expiredTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#4B5563',
+    marginBottom: 4,
+  },
+  alertBody: {
+    fontSize: 14,
+    color: '#57534E',
+    lineHeight: 20,
+  },
+  alertMeta: {
+    fontSize: 12,
+    color: '#78716C',
+    marginTop: 6,
+  },
+  extendBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: ACCENT_BLUE,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  extendBtnLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   listContent: {
     paddingBottom: 32,

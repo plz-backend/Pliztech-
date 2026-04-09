@@ -15,6 +15,7 @@ import {
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { Screen } from '@/components/Screen';
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import {
@@ -24,7 +25,7 @@ import {
   setDefaultSavedCard,
   type SavedCard,
 } from '@/lib/api/payment-methods';
-import { PlizApiError } from '@/lib/api/types';
+import { formatPlizApiErrorForUser } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
 import {
   isUnauthorizedSessionError,
@@ -146,13 +147,7 @@ export default function PaymentCardsScreen() {
           }
           return;
         }
-        const msg =
-          e instanceof PlizApiError
-            ? e.message
-            : e instanceof Error
-              ? e.message
-              : 'Could not load cards';
-        setError(msg);
+        setError(formatPlizApiErrorForUser(e));
         if (!background) {
           setCards([]);
         }
@@ -198,9 +193,7 @@ export default function PaymentCardsScreen() {
           await recoverFromUnauthorized(signOut);
           return;
         }
-        const msg =
-          e instanceof PlizApiError ? e.message : 'Could not update default card';
-        Alert.alert('Something went wrong', msg);
+        Alert.alert('Something went wrong', formatPlizApiErrorForUser(e));
       } finally {
         setBusyId(null);
       }
@@ -229,9 +222,7 @@ export default function PaymentCardsScreen() {
                   await recoverFromUnauthorized(signOut);
                   return;
                 }
-                const msg =
-                  e instanceof PlizApiError ? e.message : 'Could not remove card';
-                Alert.alert('Something went wrong', msg);
+                Alert.alert('Something went wrong', formatPlizApiErrorForUser(e));
               } finally {
                 setBusyId(null);
               }
@@ -261,18 +252,7 @@ export default function PaymentCardsScreen() {
 
   return (
     <Screen backgroundColor={BG_LIGHT}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <Text style={styles.title}>Payment Cards</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppHeaderTitleRow title="Payment Cards" />
 
       {requestId ? (
         <Text style={styles.contextHint}>
@@ -382,26 +362,6 @@ export default function PaymentCardsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  headerSpacer: {
-    width: 40,
-  },
   contextHint: {
     fontSize: 14,
     color: '#6B7280',

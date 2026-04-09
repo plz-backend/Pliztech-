@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { z } from 'zod';
 
 import { CTAButton } from '@/components/CTAButton';
 import { FormTextInput } from '@/components/FormTextInput';
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
 import { changePassword } from '@/lib/api/auth';
@@ -133,18 +133,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <Screen backgroundColor="#F9FAFB" scrollable>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color={TITLE_DARK} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Change password</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppHeaderTitleRow title="Change password" backIconColor={TITLE_DARK} />
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Password</Text>
@@ -230,26 +219,6 @@ export default function ChangePasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: TITLE_DARK,
-  },
-  headerSpacer: {
-    width: 40,
-  },
   section: {
     marginBottom: 24,
   },

@@ -16,6 +16,7 @@ const STATUS_CONFIG: Record<
 > = {
   funded: { bg: '#059669', text: '#FFFFFF', icon: 'checkmark-circle' },
   active: { bg: '#DBEAFE', text: '#2E8BEA', icon: 'checkmark-circle' },
+  pending: { bg: '#FEF3C7', text: '#B45309', icon: 'hourglass-outline' },
   expired: { bg: '#FFEDD5', text: '#EA580C', icon: 'time-outline' },
   cancelled: { bg: '#FEE2E2', text: '#DC2626', icon: 'close-circle' },
 };
@@ -31,7 +32,7 @@ export interface ActivityRequestCardProps {
 }
 
 export function ActivityRequestCard({ request, onPress, onRequestPress }: ActivityRequestCardProps) {
-  const { id, title, timeAgo, status, amount, icon } = request;
+  const { id, title, timeAgo, expiresLabel, status, amount, icon } = request;
   const config = STATUS_CONFIG[status];
 
   const card = (
@@ -57,12 +58,25 @@ export function ActivityRequestCard({ request, onPress, onRequestPress }: Activi
           {title}
         </Text>
         <Text style={styles.timeAgo}>{timeAgo}</Text>
+        {expiresLabel ? (
+          <Text
+            style={[
+              styles.expiresLine,
+              status === 'expired' && styles.expiresLineExpired,
+              (status === 'active' || status === 'pending') &&
+                expiresLabel !== 'Expired' &&
+                styles.expiresLineSoon,
+            ]}
+          >
+            {expiresLabel === 'Expired' ? 'Expired' : `Ends: ${expiresLabel}`}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.right}>
         <View style={[styles.statusChip, { backgroundColor: config.bg }]}>
           <Ionicons name={config.icon} size={14} color={config.text} style={styles.statusIcon} />
           <Text style={[styles.statusText, { color: config.text }]}>
-            {status.charAt(0).toUpperCase() + status.slice(1)}
+            {status === 'pending' ? 'Pending' : status.charAt(0).toUpperCase() + status.slice(1)}
           </Text>
         </View>
         <Text style={styles.amount}>{formatNaira(amount)}</Text>
@@ -119,6 +133,19 @@ const styles = StyleSheet.create({
   timeAgo: {
     fontSize: 13,
     color: '#6B7280',
+  },
+  expiresLine: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  expiresLineSoon: {
+    color: '#B45309',
+    fontWeight: '600',
+  },
+  expiresLineExpired: {
+    color: '#EA580C',
+    fontWeight: '600',
   },
   right: {
     alignItems: 'flex-end',

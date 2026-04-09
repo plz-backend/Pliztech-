@@ -4,10 +4,13 @@ import { PlizApiError } from './types';
 
 /** Notification `type` values from the Plz API / Prisma. */
 export type NotificationApiType =
+  | 'beg_approved'
   | 'beg_funded'
   | 'donation_received'
   | 'message_received'
-  | 'donor_reply';
+  | 'donor_reply'
+  | 'beg_expiring'
+  | 'beg_expired';
 
 export type ApiNotification = {
   id: string;
@@ -93,8 +96,13 @@ function iconForType(type: string): { icon: NotificationListIcon; iconColor: str
   switch (type) {
     case 'donation_received':
       return { icon: 'heart', iconColor: '#2E8BEA' };
+    case 'beg_approved':
     case 'beg_funded':
       return { icon: 'checkmark-circle', iconColor: '#22C55E' };
+    case 'beg_expiring':
+      return { icon: 'time', iconColor: '#EA580C' };
+    case 'beg_expired':
+      return { icon: 'alert-circle', iconColor: '#DC2626' };
     case 'message_received':
     case 'donor_reply':
       return { icon: 'chatbubble', iconColor: '#8B5CF6' };

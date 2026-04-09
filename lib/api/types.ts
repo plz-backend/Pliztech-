@@ -21,6 +21,24 @@ export class PlizApiError extends Error {
   }
 }
 
+/**
+ * Single string for Alerts / banners: top-level `message` plus validation `errors` from the API.
+ */
+export function formatPlizApiErrorForUser(error: unknown): string {
+  if (error instanceof PlizApiError) {
+    const lines: string[] = [];
+    if (error.message.trim()) lines.push(error.message.trim());
+    if (error.errors.length > 0) {
+      lines.push(
+        error.errors.map((x) => (x.field ? `${x.field}: ${x.message}` : x.message)).join('\n')
+      );
+    }
+    return lines.join('\n\n').trim() || 'Request failed';
+  }
+  if (error instanceof Error) return error.message;
+  return 'Something went wrong. Please try again.';
+}
+
 export type SignupRequestBody = {
   username: string;
   email: string;

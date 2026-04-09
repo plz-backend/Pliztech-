@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { CTAButton } from '@/components/CTAButton';
 import { Screen } from '@/components/Screen';
 import { Text } from '@/components/Text';
@@ -51,18 +52,11 @@ export default function ChangePasswordSuccessScreen() {
 
   return (
     <Screen backgroundColor="#F9FAFB" scrollable>
-      <View style={styles.header}>
-        <Pressable
-          onPress={goToSecurity}
-          style={styles.backButton}
-          accessibilityLabel="Back to Security Settings"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color={TITLE_DARK} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Password changed</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppHeaderTitleRow
+        title="Password changed"
+        onPressBack={goToSecurity}
+        backIconColor={TITLE_DARK}
+      />
 
       <View style={styles.card}>
         <View style={styles.iconWrapper}>
@@ -87,26 +81,6 @@ export default function ChangePasswordSuccessScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: TITLE_DARK,
-  },
-  headerSpacer: {
-    width: 40,
-  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,

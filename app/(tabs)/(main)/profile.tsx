@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { ProfileRow } from '@/components/profile/ProfileRow';
 import { ProfileSection } from '@/components/profile/ProfileSection';
 import { ProfileSummaryCard } from '@/components/profile/ProfileSummaryCard';
@@ -108,28 +109,7 @@ export default function ProfileScreen() {
 
   return (
     <Screen backgroundColor="#F9FAFB" scrollable>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.headerButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#9CA3AF" />
-        </Pressable>
-        <Text style={styles.headerTitle}>My Profile</Text>
-        <Pressable
-          style={styles.headerButton}
-          onPress={() => router.push('/(tabs)/notifications')}
-          accessibilityLabel="Notifications"
-          accessibilityRole="button"
-        >
-          <View>
-            <Ionicons name="notifications-outline" size={24} color="#9CA3AF" />
-            <View style={styles.badge} />
-          </View>
-        </Pressable>
-      </View>
+      <AppHeaderTitleRow title="My Profile" backIconColor="#9CA3AF" />
 
       <View style={styles.content}>
         <ProfileSummaryCard
@@ -255,32 +235,6 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-  },
-  badge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#2E8BEA',
-  },
   content: {
     paddingBottom: 32,
   },

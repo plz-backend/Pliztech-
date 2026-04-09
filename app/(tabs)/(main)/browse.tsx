@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -13,6 +12,7 @@ import {
 
 import { Text } from '@/components/Text';
 import { BrowseRequestCard } from '@/components/browse/BrowseRequestCard';
+import { AppHeaderLogoRow } from '@/components/layout/AppHeaderLogoRow';
 import { FilterChips, type MainFilter } from '@/components/browse/FilterChips';
 import { SearchBar } from '@/components/browse/SearchBar';
 import { Screen } from '@/components/Screen';
@@ -23,8 +23,6 @@ import {
 } from '@/lib/api/beg';
 import { PlizApiError } from '@/lib/api/types';
 import type { BrowseRequest } from '@/mock/home';
-
-const LOGO = require('@/assets/images/pliz-logo.png');
 
 export default function BrowseScreen() {
   const [search, setSearch] = useState('');
@@ -157,20 +155,7 @@ export default function BrowseScreen() {
 
   return (
     <Screen backgroundColor="#FFFFFF">
-      <View style={styles.headerRow}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <View style={styles.logoSection}>
-          <Image source={LOGO} style={styles.logo} contentFit="contain" />
-        </View>
-        <View style={styles.backButtonSpacer} />
-      </View>
+      <AppHeaderLogoRow />
 
       <FlatList
         data={filteredRequests}
@@ -201,32 +186,6 @@ export default function BrowseScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoSection: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    pointerEvents: 'none',
-  },
-  logo: {
-    width: 40,
-    height: 40,
-  },
-  backButtonSpacer: {
-    width: 40,
-  },
   listContent: {
     paddingBottom: 24,
     flexGrow: 1,

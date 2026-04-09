@@ -12,10 +12,12 @@ import {
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { Screen } from '@/components/Screen';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { getStoriesFeed, type StoryItem } from '@/lib/api/stories';
 import { PlizApiError } from '@/lib/api/types';
-import { getAccessToken } from '@/lib/auth/access-token';
+import { withUnauthorizedRecovery } from '@/lib/auth/session-expired';
 
 function formatStoryDate(iso?: string): string {
   if (!iso) return '';
@@ -28,6 +30,7 @@ function formatStoryDate(iso?: string): string {
 }
 
 export default function StoriesFeedScreen() {
+  const { signOut } = useCurrentUser();
   const [stories, setStories] = useState<StoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +39,9 @@ export default function StoriesFeedScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const token = await getAccessToken();
-      if (!token) {
-        setError('Sign in to view community stories.');
-        setStories([]);
-        return;
-      }
-      const res = await getStoriesFeed(token, { page: 1, limit: 30 });
+      const res = await withUnauthorizedRecovery(signOut, (token) =>
+        getStoriesFeed(token, { page: 1, limit: 30 })
+      );
       setStories(res.stories);
     } catch (e) {
       setError(
@@ -57,7 +56,7 @@ export default function StoriesFeedScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [signOut]);
 
   useEffect(() => {
     void load();
@@ -70,25 +69,20 @@ export default function StoriesFeedScreen() {
 
   return (
     <Screen backgroundColor="#F9FAFB" scrollable={false}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <Text style={styles.title}>Community stories</Text>
-        <Pressable
-          onPress={() => router.push('/(tabs)/share-story' as import('expo-router').Href)}
-          style={styles.writeBtn}
-          accessibilityLabel="Write a story"
-          accessibilityRole="button"
-        >
-          <Ionicons name="create-outline" size={22} color="#2E8BEA" />
-        </Pressable>
-      </View>
+      <AppHeaderTitleRow
+        title="Community stories"
+        marginBottom={12}
+        trailingActions={
+          <Pressable
+            onPress={() => router.push('/(tabs)/share-story' as import('expo-router').Href)}
+            style={styles.writeBtn}
+            accessibilityLabel="Write a story"
+            accessibilityRole="button"
+          >
+            <Ionicons name="create-outline" size={22} color="#2E8BEA" />
+          </Pressable>
+        }
+      />
 
       {loading ? (
         <View style={styles.centered}>
@@ -123,26 +117,6 @@ export default function StoriesFeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    marginBottom: 12,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
-    flex: 1,
-    textAlign: 'center',
-  },
   writeBtn: {
     width: 44,
     height: 44,

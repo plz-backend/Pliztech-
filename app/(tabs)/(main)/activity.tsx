@@ -1,6 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -15,6 +14,7 @@ import { Text } from '@/components/Text';
 
 import { ActivityRequestCard } from '@/components/activity/ActivityRequestCard';
 import { PastRequestOverlay } from '@/components/activity/PastRequestOverlay';
+import { AppHeaderLogoRow } from '@/components/layout/AppHeaderLogoRow';
 import { ActivityTypeFilters, type ActivityType } from '@/components/activity/ActivityTypeFilters';
 import { CommunityStories } from '@/components/activity/CommunityStories';
 import { GivingCard } from '@/components/activity/GivingCard';
@@ -33,7 +33,7 @@ import {
   summarizeGivingDonations,
 } from '@/lib/api/donations';
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
-import { PlizApiError } from '@/lib/api/types';
+import { formatPlizApiErrorForUser } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
 import {
   isUnauthorizedSessionError,
@@ -41,8 +41,6 @@ import {
 } from '@/lib/auth/session-expired';
 import { consumeStashedPastOverlayBegId } from '@/lib/navigation/post-donation-navigation';
 import type { ActivityRequest, GivingContribution } from '@/mock/activity';
-
-const LOGO = require('@/assets/images/pliz-logo.png');
 
 const MY_BEGS_PAGE_LIMIT = 100;
 const MY_DONATIONS_PAGE_LIMIT = 200;
@@ -124,7 +122,7 @@ export default function ActivityScreen() {
         setMyRequests([]);
         setRequestsSummary({ total: 0, funded: 0, active: 0 });
         setRequestsError(
-          e instanceof PlizApiError ? e.message : 'Could not load your requests.'
+          formatPlizApiErrorForUser(e)
         );
       } finally {
         setRequestsLoading(false);
@@ -177,7 +175,7 @@ export default function ActivityScreen() {
           avgGift: 0,
         });
         setGivingError(
-          e instanceof PlizApiError ? e.message : 'Could not load your giving history.'
+          formatPlizApiErrorForUser(e)
         );
       } finally {
         setGivingLoading(false);
@@ -215,7 +213,7 @@ export default function ActivityScreen() {
   );
 
   const handleActivityRequestPress = useCallback((item: ActivityRequest) => {
-    if (item.status === 'active') {
+    if (item.status === 'active' || item.status === 'pending') {
       router.push({ pathname: '/(tabs)/request/[id]', params: { id: item.id } });
       return;
     }
@@ -398,20 +396,7 @@ export default function ActivityScreen() {
 
   return (
     <Screen backgroundColor="#FFFFFF">
-      <View style={styles.headerRow}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <View style={styles.logoSection}>
-          <Image source={LOGO} style={styles.logo} contentFit="contain" />
-        </View>
-        <View style={styles.backButtonSpacer} />
-      </View>
+      <AppHeaderLogoRow />
 
       <FlatList<ListItem>
         data={typedListData}
@@ -437,32 +422,6 @@ export default function ActivityScreen() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoSection: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    pointerEvents: 'none',
-  },
-  logo: {
-    width: 40,
-    height: 40,
-  },
-  backButtonSpacer: {
-    width: 40,
-  },
   listContent: {
     paddingBottom: 24,
   },

@@ -122,6 +122,105 @@ export async function createBeg(
   return { beg: data.data.beg, message: data.message ?? 'Beg created' };
 }
 
+/** GET /api/begs/expiring — owner’s begs ending within ~1 hour (extend prompt). */
+export type ExpiringBegApi = {
+  id: string;
+  description: string | null;
+  expiryHours: number;
+  expiresAt: string;
+  amountRequested: number;
+  amountRaised: number;
+  availableExtensions: { hours: number; label: string }[];
+};
+
+/**
+ * GET /api/begs/expiring
+ */
+export async function getExpiringBegs(accessToken: string): Promise<ExpiringBegApi[]> {
+  const res = await fetch(apiUrl('/api/begs/expiring'), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    data?: { begs?: ExpiringBegApi[] };
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(data.message ?? `Request failed (${res.status})`, res.status);
+  }
+
+  return data.data?.begs ?? [];
+}
+
+/**
+ * PUT /api/begs/:id/extend — longer visibility (owner only).
+ */
+export async function extendBeg(
+  accessToken: string,
+  begId: string,
+  expiryHours: BegExpiryHours
+): Promise<{
+  beg: { id: string; expiryHours: number; expiresAt: string; status: string };
+  availableExtensions: { hours: number; label: string }[];
+}> {
+  const res = await fetch(apiUrl(`/api/begs/${encodeURIComponent(begId)}/extend`), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ expiryHours }),
+  });
+
+  let json: unknown;
+  try {
+    json = await res.json();
+  } catch {
+    throw new PlizApiError('Invalid response from server', res.status);
+  }
+
+  const data = json as {
+    success?: boolean;
+    message?: string;
+    errors?: { field: string; message: string }[];
+    data?: {
+      beg: { id: string; expiryHours: number; expiresAt: string; status: string };
+      availableExtensions?: { hours: number; label: string }[];
+    };
+  };
+
+  if (!res.ok || data.success !== true) {
+    throw new PlizApiError(
+      data.message ?? `Request failed (${res.status})`,
+      res.status,
+      Array.isArray(data.errors) ? data.errors : []
+    );
+  }
+
+  if (!data.data?.beg) {
+    throw new PlizApiError('Unexpected response shape', res.status);
+  }
+
+  return {
+    beg: data.data.beg,
+    availableExtensions: data.data.availableExtensions ?? [],
+  };
+}
+
 /** Single item from GET /api/begs feed (matches backend IBegResponse JSON). */
 export type BegFeedItem = {
   id: string;
@@ -286,6 +385,8 @@ function mapBegStatusToActivityStatus(beg: BegFeedItem): ActivityRequestStatus {
   if (s === 'cancelled') return 'cancelled';
   if (s === 'expired') return 'expired';
   if (s === 'rejected') return 'cancelled';
+  if (!beg.approved) return 'pending';
+
   if (s === 'flagged') return 'active';
 
   const goal = Math.round(Number(beg.amountRequested) || 0);
@@ -301,7 +402,8 @@ function mapBegStatusToActivityStatus(beg: BegFeedItem): ActivityRequestStatus {
  * when the beg is no longer active (fully funded, expired, cancelled, etc.).
  */
 export function isBegPastOrClosedForDonorNav(beg: BegFeedItem): boolean {
-  return mapBegStatusToActivityStatus(beg) !== 'active';
+  const st = mapBegStatusToActivityStatus(beg);
+  return st !== 'active' && st !== 'pending';
 }
 
 function categoryIconForBeg(beg: BegFeedItem): keyof typeof Ionicons.glyphMap {
@@ -316,6 +418,9 @@ export function begFeedItemToActivityRequest(beg: BegFeedItem): ActivityRequest 
     id: beg.id,
     title: (beg.title ?? '').trim() || 'Request',
     timeAgo: formatBegCreatedTimeAgo(beg.createdAt),
+    expiresLabel: !beg.approved
+      ? 'After approval'
+      : formatBegExpiresLabel(beg.expiresAt),
     status: mapBegStatusToActivityStatus(beg),
     amount: Math.round(Number(beg.amountRequested) || 0),
     categoryId: apiCategorySlugToUiCategoryId(beg.category.slug),
@@ -540,7 +645,16 @@ export function begFeedItemToRequestDetail(beg: BegFeedItem): RequestDetail {
   }
 
   const tr = beg.timeRemaining ?? '—';
-  const timeRemaining = tr === 'Expired' ? 'Expired' : `${tr} left`;
+  const timeRemaining =
+    tr === 'Expired'
+      ? 'Expired'
+      : tr === 'Pending approval'
+        ? 'Pending approval'
+        : / left$/i.test(tr)
+          ? tr
+          : `${tr} left`;
+
+  const canDonate = beg.approved && !isBegPastOrClosedForDonorNav(beg);
 
   return {
     id: beg.id,
@@ -565,5 +679,7 @@ export function begFeedItemToRequestDetail(beg: BegFeedItem): RequestDetail {
     gifts: 0,
     crowns: 0,
     messages: 0,
+    approved: beg.approved,
+    canDonate,
   };
 }

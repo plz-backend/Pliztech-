@@ -1,6 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Image } from 'expo-image';
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -21,6 +20,7 @@ import { RequestLiveModal } from '@/components/create/RequestLiveModal';
 import { RequestLimitAlert } from '@/components/create/RequestLimitAlert';
 import { CTAButton } from '@/components/CTAButton';
 import { FormTextArea } from '@/components/FormTextArea';
+import { AppHeaderLogoRow } from '@/components/layout/AppHeaderLogoRow';
 import { Screen } from '@/components/Screen';
 import { categoryEmojiForId, REQUEST_CATEGORIES } from '@/constants/categories';
 import {
@@ -33,10 +33,11 @@ import {
   type BegExpiryHours,
   uiCategoryToApiCategory,
 } from '@/lib/api/beg';
-import { PlizApiError } from '@/lib/api/types';
-import { getAccessToken } from '@/lib/auth/access-token';
-
-const LOGO = require('@/assets/images/pliz-logo.png');
+import { formatPlizApiErrorForUser } from '@/lib/api/types';
+import {
+  getAccessTokenOrTryRefresh,
+  withUnauthorizedRecovery,
+} from '@/lib/auth/session-expired';
 
 const MAX_DESC_WORDS = 40;
 
@@ -91,7 +92,7 @@ function countWords(text: string): number {
 }
 
 export default function CreateScreen() {
-  const { user } = useCurrentUser();
+  const { user, signOut } = useCurrentUser();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -122,7 +123,7 @@ export default function CreateScreen() {
   const onContinue = async (data: CreateRequestFormData) => {
     if (isSubmitting) return;
 
-    const token = await getAccessToken();
+    const token = await getAccessTokenOrTryRefresh();
     if (!token) {
       Alert.alert('Sign in required', 'Please log in to submit a request.', [
         { text: 'OK', onPress: () => router.push('/(auth)/login' as import('expo-router').Href) },
@@ -159,27 +160,21 @@ export default function CreateScreen() {
     const data = pendingSubmit;
     if (!data || isSubmitting) return;
 
-    const token = await getAccessToken();
-    if (!token) {
-      Alert.alert('Sign in required', 'Please log in to submit a request.', [
-        { text: 'OK', onPress: () => router.push('/(auth)/login' as import('expo-router').Href) },
-      ]);
-      return;
-    }
-
     const amountRequested = Number(data.amount.replace(/,/g, ''));
     const descriptionForApi = clampBegDescriptionForApi(data.description);
     const expiryHours = Number(data.expiryHours) as BegExpiryHours;
 
     setIsSubmitting(true);
     try {
-      const { beg } = await createBeg(token, {
-        description: descriptionForApi,
-        category: uiCategoryToApiCategory(data.categoryId),
-        amountRequested,
-        expiryHours,
-        mediaType: 'text',
-      });
+      const { beg } = await withUnauthorizedRecovery(signOut, (token) =>
+        createBeg(token, {
+          description: descriptionForApi,
+          category: uiCategoryToApiCategory(data.categoryId),
+          amountRequested,
+          expiryHours,
+          mediaType: 'text',
+        })
+      );
 
       const categoryMeta = REQUEST_CATEGORIES.find((c) => c.id === data.categoryId);
       const expiryHoursLabel =
@@ -195,13 +190,7 @@ export default function CreateScreen() {
         expiryLine: `Expires in ${expiryHoursLabel}`,
       });
     } catch (e) {
-      const msg =
-        e instanceof PlizApiError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : 'Something went wrong';
-      Alert.alert('Could not submit', msg);
+      Alert.alert('Could not submit', formatPlizApiErrorForUser(e));
     } finally {
       setIsSubmitting(false);
     }
@@ -219,7 +208,7 @@ export default function CreateScreen() {
 
   const onLiveDismissOrHome = () => {
     clearCreateFormAndLiveState();
-    router.navigate('/(tabs)/(main)/index' as Href);
+    router.replace('/(tabs)/(main)' as Href);
   };
 
   const onLiveViewRequest = () => {
@@ -269,20 +258,7 @@ export default function CreateScreen() {
         />
       ) : null}
       <View style={styles.content}>
-          <View style={styles.headerRow}>
-            <Pressable
-              onPress={onBack}
-              style={styles.backButton}
-              accessibilityLabel="Go back"
-              accessibilityRole="button"
-            >
-              <Ionicons name="arrow-back" size={24} color={COLORS.heading} />
-            </Pressable>
-            <View style={styles.logoSection}>
-              <Image source={LOGO} style={styles.logo} contentFit="contain" />
-            </View>
-            <View style={styles.backButtonSpacer} />
-          </View>
+          <AppHeaderLogoRow onPressBack={onBack} backIconColor={COLORS.heading} />
 
           <Text style={styles.title}>Ask for Help</Text>
           <Text style={styles.subtitle}>
@@ -432,28 +408,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     paddingBottom: 32,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    marginBottom: 16,
-  },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    padding: 8,
-  },
-  backButtonSpacer: {
-    width: 40,
-  },
-  logoSection: {
-    alignItems: 'center',
-  },
-  logo: {
-    width: 40,
-    height: 40,
   },
   title: {
     fontSize: 26,

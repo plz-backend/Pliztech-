@@ -48,6 +48,10 @@ function statusMeta(status: ActivityRequestStatus): { label: string; showCheck: 
       return { label: 'Ended', showCheck: false };
     case 'cancelled':
       return { label: 'Cancelled', showCheck: false };
+    case 'pending':
+      return { label: 'Pending approval', showCheck: false };
+    case 'active':
+      return { label: 'Active', showCheck: false };
     default:
       return { label: 'Closed', showCheck: false };
   }

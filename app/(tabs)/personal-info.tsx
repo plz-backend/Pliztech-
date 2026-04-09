@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { Screen } from '@/components/Screen';
 import {
   CURRENT_USER_FOCUS_REFETCH_STALE_MS,
@@ -76,6 +77,7 @@ export default function PersonalInfoScreen() {
   if (isLoading && !user) {
     return (
       <Screen backgroundColor="#FFFFFF">
+        <AppHeaderTitleRow title="Personal Information" />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#2E8BEA" />
           <Text style={styles.loadingText}>Loading your information…</Text>
@@ -87,18 +89,7 @@ export default function PersonalInfoScreen() {
   if (!user) {
     return (
       <Screen backgroundColor="#FFFFFF">
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backButton}
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
-          </Pressable>
-          <Text style={styles.title}>Personal Information</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <AppHeaderTitleRow title="Personal Information" />
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error ?? 'Could not load your profile.'}</Text>
           <Pressable onPress={() => void refreshUser()} style={styles.retryBtn}>
@@ -116,18 +107,7 @@ export default function PersonalInfoScreen() {
 
   return (
     <Screen backgroundColor="#FFFFFF">
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <Text style={styles.title}>Personal Information</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppHeaderTitleRow title="Personal Information" />
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Personal Information</Text>
@@ -161,26 +141,6 @@ export default function PersonalInfoScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: VALUE_DARK,
-  },
-  headerSpacer: {
-    width: 40,
-  },
   card: {
     backgroundColor: '#F9FAFB',
     borderRadius: 16,

@@ -26,6 +26,10 @@ import { NIGERIAN_STATES } from '@/constants/nigerian-states';
 import { completeProfile } from '@/lib/api/profile';
 import { PlizApiError } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
+import {
+  getAccessTokenOrTryRefresh,
+  withUnauthorizedRecovery,
+} from '@/lib/auth/session-expired';
 
 const LOGO = require('@/assets/images/pliz-logo.png');
 
@@ -120,7 +124,7 @@ const COLORS = {
 } as const;
 
 export default function SignupProfileScreen() {
-  const { refreshUser } = useCurrentUser();
+  const { refreshUser, signOut } = useCurrentUser();
   const [consentChecked, setConsentChecked] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [stateModalOpen, setStateModalOpen] = useState(false);
@@ -191,9 +195,13 @@ export default function SignupProfileScreen() {
   };
 
   const onContinue = async (data: ProfileFormData) => {
-    if (!accessToken) {
+    const tokenReady = accessToken ?? (await getAccessTokenOrTryRefresh());
+    if (!tokenReady) {
       setApiMessage('Sign in to complete your profile.');
       return;
+    }
+    if (!accessToken && tokenReady) {
+      setAccessTokenState(tokenReady);
     }
     if (!consentChecked) {
       setConsentError('You must agree to the Terms of Service and Privacy Policy');
@@ -208,20 +216,22 @@ export default function SignupProfileScreen() {
           ? normalizeNigeriaPhoneInput(data.phoneNumber)
           : normalizeIntlPhoneInput(data.phoneNumber);
 
-      await completeProfile(accessToken, {
-        firstName: data.firstName,
-        middleName: data.middleName?.trim() || undefined,
-        lastName: data.lastName,
-        displayName: data.displayName?.trim() || undefined,
-        dateOfBirth: data.dateOfBirth.trim(),
-        gender: data.gender as 'male' | 'female',
-        phoneNumber: phoneNormalized,
-        state: data.state,
-        city: data.city.trim(),
-        address: data.address?.trim() || undefined,
-        agreeToTerms: true,
-        isAnonymous: false,
-      });
+      await withUnauthorizedRecovery(signOut, (token) =>
+        completeProfile(token, {
+          firstName: data.firstName,
+          middleName: data.middleName?.trim() || undefined,
+          lastName: data.lastName,
+          displayName: data.displayName?.trim() || undefined,
+          dateOfBirth: data.dateOfBirth.trim(),
+          gender: data.gender as 'male' | 'female',
+          phoneNumber: phoneNormalized,
+          state: data.state,
+          city: data.city.trim(),
+          address: data.address?.trim() || undefined,
+          agreeToTerms: true,
+          isAnonymous: false,
+        })
+      );
       await refreshUser();
       router.replace('/(tabs)' as import('expo-router').Href);
     } catch (e) {

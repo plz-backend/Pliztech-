@@ -3,7 +3,12 @@ import { Image } from 'expo-image';
 import { router, type Href } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { HeaderNotificationButton } from '@/components/home/HeaderNotificationButton';
+import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
+
 const LOGO = require('@/assets/images/pliz-logo.png');
+
+const NOTIFICATIONS_HREF = '/(tabs)/notifications' as Href;
 
 export type RequestDetailHeaderProps = {
   /** Report / flag this request (Figma: top-right flag). */
@@ -19,6 +24,8 @@ function goBackOrHome() {
 }
 
 export function RequestDetailHeader({ onReportPress }: RequestDetailHeaderProps) {
+  const { unreadCount } = useUnreadNotificationCount();
+
   const handleReport = () => {
     if (onReportPress) {
       onReportPress();
@@ -40,14 +47,20 @@ export function RequestDetailHeader({ onReportPress }: RequestDetailHeaderProps)
       <View style={styles.logoWrap}>
         <Image source={LOGO} style={styles.logo} contentFit="contain" />
       </View>
-      <Pressable
-        style={styles.iconCircle}
-        onPress={handleReport}
-        accessibilityLabel="Report or flag this request"
-        accessibilityRole="button"
-      >
-        <Ionicons name="flag-outline" size={20} color="#1F2937" />
-      </Pressable>
+      <View style={styles.rightCluster}>
+        <HeaderNotificationButton
+          onPress={() => router.push(NOTIFICATIONS_HREF)}
+          unreadCount={unreadCount}
+        />
+        <Pressable
+          style={styles.iconCircle}
+          onPress={handleReport}
+          accessibilityLabel="Report or flag this request"
+          accessibilityRole="button"
+        >
+          <Ionicons name="flag-outline" size={20} color="#1F2937" />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -66,6 +79,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rightCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
   },
   iconCircle: {
     width: 40,

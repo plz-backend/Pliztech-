@@ -1,16 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, TextInput, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
+import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { Screen } from '@/components/Screen';
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { updateProfile } from '@/lib/api/profile';
-import { PlizApiError } from '@/lib/api/types';
-import { getAccessToken } from '@/lib/auth/access-token';
+import { formatPlizApiErrorForUser } from '@/lib/api/types';
+import { withUnauthorizedRecovery } from '@/lib/auth/session-expired';
 
 const BORDER_GRAY = '#E5E7EB';
 const LABEL_GRAY = '#6B7280';
@@ -63,7 +64,7 @@ function EditField({
 }
 
 export default function EditPersonalInfoScreen() {
-  const { user, isLoading, refreshUser } = useCurrentUser();
+  const { user, isLoading, refreshUser, signOut } = useCurrentUser();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -97,12 +98,6 @@ export default function EditPersonalInfoScreen() {
       return;
     }
 
-    const token = await getAccessToken();
-    if (!token) {
-      Alert.alert('Session expired', 'Please sign in again.');
-      return;
-    }
-
     setSaving(true);
     try {
       const body: { firstName: string; lastName: string; phoneNumber?: string } = {
@@ -114,17 +109,15 @@ export default function EditPersonalInfoScreen() {
         body.phoneNumber = normalizedPhone;
       }
 
-      await updateProfile(token, body);
+      await withUnauthorizedRecovery(signOut, (token) => updateProfile(token, body));
       await refreshUser();
       router.back();
     } catch (e) {
-      const msg =
-        e instanceof PlizApiError ? e.message : e instanceof Error ? e.message : 'Something went wrong';
-      Alert.alert('Could not save', msg);
+      Alert.alert('Could not save', formatPlizApiErrorForUser(e));
     } finally {
       setSaving(false);
     }
-  }, [firstName, lastName, phoneNumber, refreshUser]);
+  }, [firstName, lastName, phoneNumber, refreshUser, signOut]);
 
   if (isLoading && !user) {
     return (
@@ -139,18 +132,7 @@ export default function EditPersonalInfoScreen() {
   if (!user?.profile) {
     return (
       <Screen backgroundColor="#FFFFFF" scrollable>
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backButton}
-            accessibilityLabel="Go back"
-            accessibilityRole="button"
-          >
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
-          </Pressable>
-          <Text style={styles.title}>Personal information</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        <AppHeaderTitleRow title="Personal information" marginBottom={24} />
         <Text style={styles.missingProfile}>
           Complete your profile first before editing these details.
         </Text>
@@ -160,18 +142,7 @@ export default function EditPersonalInfoScreen() {
 
   return (
     <Screen backgroundColor="#FFFFFF" scrollable>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </Pressable>
-        <Text style={styles.title}>Personal information</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AppHeaderTitleRow title="Personal information" marginBottom={24} />
 
       <EditField
         icon="person-outline"
@@ -215,26 +186,6 @@ export default function EditPersonalInfoScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: VALUE_DARK,
-  },
-  headerSpacer: {
-    width: 40,
-  },
   field: {
     marginBottom: 20,
   },
