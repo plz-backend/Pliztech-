@@ -5,7 +5,7 @@ import { Text } from '@/components/Text';
 import { CommunityStoriesCard } from './CommunityStoriesCard';
 import { ContributionCard } from './ContributionCard';
 
-import type { RecentContribution } from '@/mock/home';
+import type { RecentContribution } from '@/lib/types/home';
 
 const HEADING = '#1F2937';
 const BRAND_BLUE = '#2E8BEA';

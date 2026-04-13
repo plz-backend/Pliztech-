@@ -1,9 +1,9 @@
 import { apiUrl } from '@/constants/api';
 import { REQUEST_CATEGORIES } from '@/constants/categories';
 import { avatarColorFromSeed } from '@/contexts/CurrentUserContext';
-import type { ActivityRequest, ActivityRequestStatus } from '@/mock/activity';
-import type { BrowseRequest, TrendingRequest } from '@/mock/home';
-import type { RequestDetail } from '@/mock/requests';
+import type { ActivityRequest, ActivityRequestStatus } from '@/lib/types/activity';
+import type { BrowseRequest, TrendingRequest } from '@/lib/types/home';
+import type { RequestDetail } from '@/lib/types/requests';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 

@@ -619,7 +619,7 @@ export default function WithdrawFundsScreen() {
           text: 'Share a story',
           onPress: () => {
             void load();
-            router.replace('/(tabs)/share-story' as import('expo-router').Href);
+            router.replace('/(tabs)/share-story');
           },
         },
         {

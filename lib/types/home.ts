@@ -1,0 +1,45 @@
+/** Home dashboard trending row (API-mapped). */
+export type TrendingRequest = {
+  id: string;
+  name: string;
+  initial: string;
+  avatarColor: string;
+  timeAgo: string;
+  /** Time until request expires (from API `expiresAt`). */
+  expiresInLabel?: string;
+  text: string;
+  raised: number;
+  goal: number;
+  percent: number;
+  /** ISO date for client-side sort (API). */
+  createdAt?: string;
+};
+
+/** Home “My recent contributions” row (API-mapped). */
+export type RecentContribution = {
+  id: string;
+  /** Recipient you donated to (or “Community member” if anonymous gift). */
+  contributorName: string;
+  description: string;
+  amount: number;
+  timeAgo: string;
+};
+
+/** Browse feed card shape (API-mapped). */
+export type BrowseRequest = {
+  id: string;
+  name: string;
+  initial: string;
+  avatarColor: string;
+  timeLeft: string;
+  categoryId: string;
+  categoryLabel: string;
+  badge?: string;
+  text: string;
+  raised: number;
+  goal: number;
+  percent: number;
+  /** ISO timestamps when mapped from API (for client-side sort). */
+  createdAt?: string;
+  expiresAt?: string;
+};

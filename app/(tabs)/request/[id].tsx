@@ -32,11 +32,8 @@ import { formatPlizApiErrorForUser } from '@/lib/api/types';
 import { savePendingDonationThankYou } from '@/lib/donation/pending-thank-you';
 import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { withUnauthorizedRecovery } from '@/lib/auth/session-expired';
-import type { RequestDetail } from '@/mock/requests';
-import {
-    getPlatformFee,
-    getRequestReceives,
-} from '@/mock/requests';
+import type { RequestDetail } from '@/lib/types/requests';
+import { getPlatformFee, getRequestReceives } from '@/lib/types/requests';
 
 const AMOUNT_OPTIONS = [
   { value: 1000, label: '₦1K' },

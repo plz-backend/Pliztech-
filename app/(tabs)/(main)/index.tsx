@@ -23,7 +23,7 @@ import {
   isUnauthorizedSessionError,
   recoverFromUnauthorized,
 } from '@/lib/auth/session-expired';
-import type { RecentContribution, TrendingRequest } from '@/mock/home';
+import type { RecentContribution, TrendingRequest } from '@/lib/types/home';
 
 import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 

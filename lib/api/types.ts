@@ -21,19 +21,85 @@ export class PlizApiError extends Error {
   }
 }
 
+/** Normalize validation / error items from API JSON. */
+function normalizeApiErrorItems(raw: unknown): ApiErrorItem[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ApiErrorItem[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const row = item as Record<string, unknown>;
+    const m = row.message;
+    if (typeof m !== 'string' || !m.trim()) continue;
+    const f = row.field;
+    out.push({
+      field: typeof f === 'string' ? f : '',
+      message: m.trim(),
+    });
+  }
+  return out;
+}
+
+/**
+ * Build `PlizApiError` from a failed API JSON body (`message`, optional `errors`, optional `error`).
+ */
+export function apiFailureFromResponseJson(json: unknown, httpStatus: number): PlizApiError {
+  const fallback = `Request failed (${httpStatus})`;
+  if (!json || typeof json !== 'object' || Array.isArray(json)) {
+    return new PlizApiError(fallback, httpStatus);
+  }
+  const o = json as Record<string, unknown>;
+
+  let message = '';
+  if (typeof o.message === 'string' && o.message.trim()) {
+    message = o.message.trim();
+  } else if (typeof o.error === 'string' && o.error.trim()) {
+    message = o.error.trim();
+  } else if (o.error && typeof o.error === 'object' && o.error !== null) {
+    const inner = o.error as Record<string, unknown>;
+    if (typeof inner.message === 'string' && inner.message.trim()) {
+      message = inner.message.trim();
+    }
+  }
+
+  const errors = normalizeApiErrorItems(o.errors);
+  return new PlizApiError(message || fallback, httpStatus, errors);
+}
+
+function formatPlizApiMessageBody(message: string, errors: ApiErrorItem[]): string {
+  const lines: string[] = [];
+  if (message.trim()) lines.push(message.trim());
+  if (errors.length > 0) {
+    lines.push(
+      errors.map((x) => (x.field ? `${x.field}: ${x.message}` : x.message)).join('\n')
+    );
+  }
+  return lines.join('\n\n').trim() || 'Request failed';
+}
+
 /**
  * Single string for Alerts / banners: top-level `message` plus validation `errors` from the API.
  */
 export function formatPlizApiErrorForUser(error: unknown): string {
   if (error instanceof PlizApiError) {
-    const lines: string[] = [];
-    if (error.message.trim()) lines.push(error.message.trim());
-    if (error.errors.length > 0) {
-      lines.push(
-        error.errors.map((x) => (x.field ? `${x.field}: ${x.message}` : x.message)).join('\n')
-      );
+    return formatPlizApiMessageBody(error.message, error.errors);
+  }
+  // Metro can load duplicate class instances so `instanceof` may fail; duck-type API errors.
+  if (error && typeof error === 'object' && 'message' in error) {
+    const msg = (error as { message: unknown }).message;
+    if (typeof msg === 'string') {
+      const status = (error as { status?: unknown }).status;
+      const errs =
+        'errors' in error && Array.isArray((error as { errors: unknown }).errors)
+          ? normalizeApiErrorItems((error as { errors: unknown[] }).errors)
+          : [];
+      if (typeof status === 'number') {
+        return formatPlizApiMessageBody(msg, errs);
+      }
+      if (errs.length > 0) {
+        return formatPlizApiMessageBody(msg, errs);
+      }
+      if (msg.trim()) return msg.trim();
     }
-    return lines.join('\n\n').trim() || 'Request failed';
   }
   if (error instanceof Error) return error.message;
   return 'Something went wrong. Please try again.';

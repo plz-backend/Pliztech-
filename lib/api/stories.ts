@@ -1,6 +1,7 @@
 import { apiUrl } from '@/constants/api';
+import { isWebAuthEnvironment } from '@/lib/auth/web-auth';
 
-import { PlizApiError } from './types';
+import { apiFailureFromResponseJson, PlizApiError } from './types';
 
 export type StoryAuthor = {
   username: string;
@@ -42,6 +43,7 @@ export async function getStoriesFeed(
       Accept: 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
+    credentials: isWebAuthEnvironment() ? 'include' : 'omit',
   });
 
   let json: unknown;
@@ -54,11 +56,12 @@ export async function getStoriesFeed(
   const data = json as {
     success?: boolean;
     message?: string;
+    errors?: { field: string; message: string }[];
     data?: { stories?: StoryItem[]; total?: number; pages?: number };
   };
 
   if (!res.ok || data.success !== true) {
-    throw new PlizApiError(data.message ?? `Request failed (${res.status})`, res.status);
+    throw apiFailureFromResponseJson(json, res.status);
   }
 
   const raw = data.data;
@@ -79,10 +82,16 @@ export async function getStoriesFeed(
 /**
  * POST /api/stories — submit story (max 60 words server-side).
  */
+export type CreateStoryResult = {
+  story: { id: string; content: string };
+  /** Top-level API message from backend (e.g. submission confirmation). */
+  message: string;
+};
+
 export async function createStory(
   accessToken: string,
   body: { content: string }
-): Promise<{ id: string; content: string }> {
+): Promise<CreateStoryResult> {
   const res = await fetch(apiUrl('/api/stories'), {
     method: 'POST',
     headers: {
@@ -90,25 +99,40 @@ export async function createStory(
       Accept: 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
+    credentials: isWebAuthEnvironment() ? 'include' : 'omit',
     body: JSON.stringify({ content: body.content }),
   });
 
-  let json: unknown;
-  try {
-    json = await res.json();
-  } catch {
-    throw new PlizApiError('Invalid response from server', res.status);
+  const text = await res.text();
+  let json: unknown = {};
+  if (text) {
+    try {
+      json = JSON.parse(text) as unknown;
+    } catch {
+      throw new PlizApiError('Invalid response from server', res.status);
+    }
   }
 
   const data = json as {
     success?: boolean;
     message?: string;
+    errors?: { field: string; message: string }[];
     data?: { story: { id: string; content: string } };
   };
 
-  if (!res.ok || data.success !== true || !data.data?.story) {
-    throw new PlizApiError(data.message ?? `Request failed (${res.status})`, res.status);
+  if (!res.ok || data.success !== true) {
+    throw apiFailureFromResponseJson(json, res.status);
   }
 
-  return data.data.story;
+  if (!data.data?.story) {
+    throw new PlizApiError(
+      data.message ?? 'Unexpected response from server',
+      res.status
+    );
+  }
+
+  return {
+    story: data.data.story,
+    message: (data.message ?? 'Story submitted.').trim() || 'Story submitted.',
+  };
 }

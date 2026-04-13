@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
-import type { RecentContribution } from '@/mock/home';
+import type { RecentContribution } from '@/lib/types/home';
 
 const HEADING = '#1F2937';
 const BODY = '#6B7280';

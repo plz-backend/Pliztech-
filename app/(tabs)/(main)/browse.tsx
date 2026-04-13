@@ -22,7 +22,7 @@ import {
   uiCategoryToApiCategory,
 } from '@/lib/api/beg';
 import { PlizApiError } from '@/lib/api/types';
-import type { BrowseRequest } from '@/mock/home';
+import type { BrowseRequest } from '@/lib/types/home';
 
 export default function BrowseScreen() {
   const [search, setSearch] = useState('');

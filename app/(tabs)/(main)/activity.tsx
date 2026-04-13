@@ -3,44 +3,44 @@ import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    View,
 } from 'react-native';
 
 import { Text } from '@/components/Text';
 
 import { ActivityRequestCard } from '@/components/activity/ActivityRequestCard';
-import { PastRequestOverlay } from '@/components/activity/PastRequestOverlay';
-import { AppHeaderLogoRow } from '@/components/layout/AppHeaderLogoRow';
 import { ActivityTypeFilters, type ActivityType } from '@/components/activity/ActivityTypeFilters';
 import { CommunityStories } from '@/components/activity/CommunityStories';
 import { GivingCard } from '@/components/activity/GivingCard';
 import { GivingSummaryCards } from '@/components/activity/GivingSummaryCards';
+import { PastRequestOverlay } from '@/components/activity/PastRequestOverlay';
 import { SummaryCards } from '@/components/activity/SummaryCards';
+import { AppHeaderLogoRow } from '@/components/layout/AppHeaderLogoRow';
 import { Screen } from '@/components/Screen';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import {
-  begFeedItemToActivityRequest,
-  getBegById,
-  getMyBegs,
-  summarizeActivityRequests,
+    begFeedItemToActivityRequest,
+    getBegById,
+    getMyBegs,
+    summarizeActivityRequests,
 } from '@/lib/api/beg';
 import {
-  getMyDonations,
-  myDonationToGivingContribution,
-  summarizeGivingDonations,
+    getMyDonations,
+    myDonationToGivingContribution,
+    summarizeGivingDonations,
 } from '@/lib/api/donations';
-import { useCurrentUser } from '@/contexts/CurrentUserContext';
 import { formatPlizApiErrorForUser } from '@/lib/api/types';
 import { getAccessToken } from '@/lib/auth/access-token';
 import {
-  isUnauthorizedSessionError,
-  recoverFromUnauthorized,
+    isUnauthorizedSessionError,
+    recoverFromUnauthorized,
 } from '@/lib/auth/session-expired';
 import { consumeStashedPastOverlayBegId } from '@/lib/navigation/post-donation-navigation';
-import type { ActivityRequest, GivingContribution } from '@/mock/activity';
+import type { ActivityRequest, GivingContribution } from '@/lib/types/activity';
 
 const MY_BEGS_PAGE_LIMIT = 100;
 const MY_DONATIONS_PAGE_LIMIT = 200;

@@ -1,11 +1,9 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Switch,
   TextInput,
@@ -22,17 +20,15 @@ import { updateProfile } from '@/lib/api/profile';
 import { formatPlizApiErrorForUser } from '@/lib/api/types';
 import { withUnauthorizedRecovery } from '@/lib/auth/session-expired';
 
-const MAX_WORDS = 60;
+const STORY_MAX_CHARS = 500;
+const STORY_MAX_WORDS = 60;
+const STORY_MIN_CHARS = 10;
 
-const STORY_TOPICS = [
-  'How Plz helped me',
-  'After my withdrawal',
-  'Paying it forward',
-  'Community support',
-  'Family & health',
-  'Education & work',
-  'Other',
-] as const;
+function firstQueryParam(value: string | string[] | undefined): string {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value) && value[0]) return String(value[0]).trim();
+  return '';
+}
 
 function countWords(text: string): number {
   return text
@@ -42,27 +38,27 @@ function countWords(text: string): number {
 }
 
 export default function ShareStoryScreen() {
-  const { topic: topicParam } = useLocalSearchParams<{ topic?: string }>();
+  const params = useLocalSearchParams<{ prefill?: string }>();
+  const prefillFromRoute = firstQueryParam(params.prefill);
   const { user, refreshUser, signOut } = useCurrentUser();
-  const [topic, setTopic] = useState<string>(() => {
-    const t = typeof topicParam === 'string' ? topicParam : '';
-    return STORY_TOPICS.includes(t as (typeof STORY_TOPICS)[number]) ? t : STORY_TOPICS[0];
-  });
   const [body, setBody] = useState('');
-  const [topicPickerOpen, setTopicPickerOpen] = useState(false);
+  const prefillAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (prefillFromRoute && !prefillAppliedRef.current) {
+      setBody(prefillFromRoute.slice(0, STORY_MAX_CHARS));
+      prefillAppliedRef.current = true;
+    }
+  }, [prefillFromRoute]);
+
   const [anonymous, setAnonymous] = useState(user?.profile?.isAnonymous ?? false);
   const [submitting, setSubmitting] = useState(false);
 
-  const composedContent = useMemo(() => {
-    const prefix = topic ? `[${topic}] ` : '';
-    return `${prefix}${body.trim()}`.trim();
-  }, [topic, body]);
-
-  const words = useMemo(() => countWords(composedContent), [composedContent]);
-  const overLimit = words > MAX_WORDS;
+  const trimmed = body.trim();
+  const words = countWords(trimmed);
+  const overLimit = trimmed.length > STORY_MAX_CHARS || words > STORY_MAX_WORDS;
   const canSubmit =
-    words >= 1 && !overLimit && composedContent.trim().length >= 10 && !overLimit;
-
+    trimmed.length >= STORY_MIN_CHARS && !overLimit && !submitting;
 
   const submit = async () => {
     if (!canSubmit || overLimit) return;
@@ -73,13 +69,14 @@ export default function ShareStoryScreen() {
           await updateProfile(token, { isAnonymous: anonymous });
           await refreshUser();
         }
-        await createStory(token, { content: composedContent });
+        const { message } = await createStory(token, { content: trimmed });
+        Alert.alert('Story submitted', message, [
+          {
+            text: 'Go to home',
+            onPress: () => router.replace('/(tabs)/(main)' as Href),
+          },
+        ]);
       });
-      Alert.alert(
-        'Story submitted',
-        'Thank you. Your story will appear in the community after review.',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
     } catch (e) {
       Alert.alert('Could not submit', formatPlizApiErrorForUser(e));
     } finally {
@@ -92,34 +89,9 @@ export default function ShareStoryScreen() {
       <AppHeaderTitleRow title="Share your story" />
 
       <Text style={styles.lead}>
-        Stories are up to {MAX_WORDS} words. They are reviewed before they appear in the feed.
+        Up to {STORY_MAX_WORDS} words and {STORY_MAX_CHARS} characters. Stories are reviewed
+        before they appear in the feed.
       </Text>
-
-      <Text style={styles.label}>Topic</Text>
-      <Pressable
-        style={styles.select}
-        onPress={() => setTopicPickerOpen((o) => !o)}
-        accessibilityRole="button"
-      >
-        <Text style={styles.selectText}>{topic}</Text>
-        <Ionicons name="chevron-down" size={20} color="#6B7280" />
-      </Pressable>
-      {topicPickerOpen ? (
-        <ScrollView style={styles.topicList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-          {STORY_TOPICS.map((t) => (
-            <Pressable
-              key={t}
-              style={styles.topicRow}
-              onPress={() => {
-                setTopic(t);
-                setTopicPickerOpen(false);
-              }}
-            >
-              <Text style={styles.topicRowText}>{t}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      ) : null}
 
       <Text style={styles.label}>Your story</Text>
       <TextInput
@@ -130,12 +102,12 @@ export default function ShareStoryScreen() {
         placeholderTextColor="#9CA3AF"
         value={body}
         onChangeText={setBody}
-        maxLength={2800}
+        maxLength={STORY_MAX_CHARS}
       />
       <Text style={[styles.wordCount, overLimit && styles.wordCountError]}>
-        {words} / {MAX_WORDS} words
-        {composedContent.trim().length > 0 && composedContent.trim().length < 10
-          ? ' · At least 10 characters required'
+        {words} / {STORY_MAX_WORDS} words · {body.length} / {STORY_MAX_CHARS} characters
+        {trimmed.length > 0 && trimmed.length < STORY_MIN_CHARS
+          ? ` · At least ${STORY_MIN_CHARS} characters`
           : ''}
       </Text>
 
@@ -183,40 +155,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 8,
-  },
-  select: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 8,
-  },
-  selectText: {
-    fontSize: 16,
-    color: '#1F2937',
-  },
-  topicList: {
-    maxHeight: 200,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
-  },
-  topicRow: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  topicRowText: {
-    fontSize: 15,
-    color: '#1F2937',
   },
   input: {
     minHeight: 140,

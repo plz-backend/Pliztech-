@@ -4,7 +4,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
-import type { GivingContribution } from '@/mock/activity';
+import type { GivingContribution } from '@/lib/types/activity';
 
 function formatNaira(amount: number) {
   return `₦${amount.toLocaleString()}`;

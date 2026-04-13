@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { router, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -22,9 +23,12 @@ import {
     getBegById,
 } from '@/lib/api/beg';
 import { getBegDonations, type BegDonationApiItem } from '@/lib/api/donations';
-import { PlizApiError } from '@/lib/api/types';
-import type { ActivityRequest, ActivityRequestStatus } from '@/mock/activity';
-import type { RequestDetail } from '@/mock/requests';
+import { createStory } from '@/lib/api/stories';
+import { formatPlizApiErrorForUser, PlizApiError } from '@/lib/api/types';
+import { withUnauthorizedRecovery } from '@/lib/auth/session-expired';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
+import type { ActivityRequest, ActivityRequestStatus } from '@/lib/types/activity';
+import type { RequestDetail } from '@/lib/types/requests';
 
 const BG = '#F9FAFB';
 const CARD = '#FFFFFF';
@@ -34,7 +38,17 @@ const MUTED = '#6B7280';
 const BLUE = '#2E8BEA';
 const GREEN = '#059669';
 const SECTION_BLUE = '#1E40AF';
-const TESTIMONY_MAX = 280;
+/** Matches backend story validation (500 chars, 60 words, min 10 chars). */
+const STORY_MAX_CHARS = 500;
+const STORY_MAX_WORDS = 60;
+const STORY_MIN_CHARS = 10;
+
+function countWords(text: string): number {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0).length;
+}
 
 function formatNaira(amount: number) {
   return `₦${Math.round(amount).toLocaleString()}`;
@@ -73,11 +87,15 @@ export interface PastRequestOverlayProps {
 
 export function PastRequestOverlay({ visible, onClose, summary }: PastRequestOverlayProps) {
   const insets = useSafeAreaInsets();
+  const { signOut } = useCurrentUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<RequestDetail | null>(null);
   const [donations, setDonations] = useState<BegDonationApiItem[]>([]);
   const [testimony, setTestimony] = useState('');
+  const [shareSubmitting, setShareSubmitting] = useState(false);
+  /** API error from “Share story” (shown above the testimony field). */
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!summary?.id) return;
@@ -111,6 +129,7 @@ export function PastRequestOverlay({ visible, onClose, summary }: PastRequestOve
       setDonations([]);
       setError(null);
       setTestimony('');
+      setShareError(null);
       return;
     }
     void load();
@@ -130,15 +149,53 @@ export function PastRequestOverlay({ visible, onClose, summary }: PastRequestOve
   const gifts = detail?.gifts ?? 0;
   const reactionTotal = thumbsUp + hearts + gifts;
 
+  const testimonyTrimmed = testimony.trim();
+  const wordCount = countWords(testimonyTrimmed);
+  const testimonyTooLong =
+    testimonyTrimmed.length > STORY_MAX_CHARS || wordCount > STORY_MAX_WORDS;
+  const canShareStory =
+    testimonyTrimmed.length >= STORY_MIN_CHARS && !testimonyTooLong && !shareSubmitting;
+
   const onShareStory = () => {
-    if (testimony.trim().length > 0) {
+    const content = testimonyTrimmed;
+    if (content.length < STORY_MIN_CHARS) {
       Alert.alert(
-        'Thanks for sharing',
-        'Your story will appear here once sharing goes live. We’re glad this help made a difference.'
+        'Add your story',
+        `Please write at least ${STORY_MIN_CHARS} characters about how this help made a difference.`
       );
-    } else {
-      Alert.alert('Add a story', 'Write a short testimony to share how this help made a difference (optional).');
+      return;
     }
+    if (content.length > STORY_MAX_CHARS) {
+      Alert.alert('Too long', `Stories can be at most ${STORY_MAX_CHARS} characters.`);
+      return;
+    }
+    if (countWords(content) > STORY_MAX_WORDS) {
+      Alert.alert('Too long', `Stories can be at most ${STORY_MAX_WORDS} words.`);
+      return;
+    }
+
+    setShareError(null);
+    setShareSubmitting(true);
+    void (async () => {
+      try {
+        await withUnauthorizedRecovery(signOut, async (token) => {
+          const { message } = await createStory(token, { content });
+          setShareError(null);
+          onClose();
+          setTestimony('');
+          Alert.alert('Story submitted', message, [
+            {
+              text: 'Go to home',
+              onPress: () => router.replace('/(tabs)/(main)' as Href),
+            },
+          ]);
+        });
+      } catch (e) {
+        setShareError(formatPlizApiErrorForUser(e));
+      } finally {
+        setShareSubmitting(false);
+      }
+    })();
   };
 
   return (
@@ -274,29 +331,58 @@ export function PastRequestOverlay({ visible, onClose, summary }: PastRequestOve
                   <Text style={styles.sectionEmoji}>❝ </Text>
                   Your testimony
                 </Text>
-                <Text style={styles.optionalLabel}>optional</Text>
               </View>
+              <Text style={styles.testimonyHint}>
+                Share how this help made a difference (10–{STORY_MAX_CHARS} characters, max{' '}
+                {STORY_MAX_WORDS} words).
+              </Text>
+              {shareError ? (
+                <View
+                  style={styles.shareErrorBox}
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                >
+                  <Text style={styles.shareErrorText}>{shareError}</Text>
+                </View>
+              ) : null}
               <TextInput
                 style={styles.testimonyInput}
-                placeholder="Share how this help made a difference... (e.g. 'Thanks to the community, I made it to my interview and later got the job!')"
+                placeholder="e.g. Thanks to the community, I made it to my interview and later got the job!"
                 placeholderTextColor="#9CA3AF"
                 multiline
-                maxLength={TESTIMONY_MAX}
+                maxLength={STORY_MAX_CHARS}
                 value={testimony}
-                onChangeText={setTestimony}
+                onChangeText={(t) => {
+                  setShareError(null);
+                  setTestimony(t);
+                }}
                 textAlignVertical="top"
               />
-              <Text style={styles.charCount}>
-                {testimony.length}/{TESTIMONY_MAX}
+              <Text
+                style={[styles.charCount, testimonyTooLong && styles.charCountError]}
+              >
+                {wordCount}/{STORY_MAX_WORDS} words · {testimony.length}/{STORY_MAX_CHARS}{' '}
+                characters
+                {testimonyTrimmed.length > 0 && testimonyTrimmed.length < STORY_MIN_CHARS
+                  ? ` · At least ${STORY_MIN_CHARS} characters`
+                  : ''}
               </Text>
 
               <View style={styles.ctaWrap}>
+                {shareSubmitting ? (
+                  <ActivityIndicator
+                    style={{ marginBottom: 12 }}
+                    color={BLUE}
+                    accessibilityLabel="Submitting story"
+                  />
+                ) : null}
                 <CTAButton
                   variant="gradient"
-                  label="Share story"
+                  label={shareSubmitting ? 'Sharing…' : 'Share story'}
                   leftIcon="paper-plane-outline"
                   onPress={onShareStory}
                   accessibilityLabel="Share story"
+                  disabled={!canShareStory}
                 />
               </View>
             </>
@@ -541,9 +627,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  optionalLabel: {
+  testimonyHint: {
     fontSize: 13,
     color: MUTED,
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  shareErrorBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  shareErrorText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#B91C1C',
   },
   testimonyInput: {
     backgroundColor: CARD,
@@ -560,6 +661,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: MUTED,
     marginBottom: 20,
+  },
+  charCountError: {
+    color: '#DC2626',
+    fontWeight: '600',
   },
   ctaWrap: {
     alignItems: 'center',

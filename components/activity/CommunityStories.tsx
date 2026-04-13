@@ -1,6 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
   NativeSyntheticEvent,
@@ -12,25 +14,90 @@ import {
 
 import { Text } from '@/components/Text';
 
-import { StoryCard } from '@/components/activity/StoryCard';
-import { MOCK_COMMUNITY_STORIES } from '@/mock/activity';
-import type { CommunityStory } from '@/mock/activity';
+import { StoryCard, type StoryCardData } from '@/components/activity/StoryCard';
+import { getStoriesFeed, type StoryItem } from '@/lib/api/stories';
+import { formatPlizApiErrorForUser } from '@/lib/api/types';
+import { useCurrentUser } from '@/contexts/CurrentUserContext';
+import { getAccessToken } from '@/lib/auth/access-token';
+import {
+  isUnauthorizedSessionError,
+  recoverFromUnauthorized,
+} from '@/lib/auth/session-expired';
 
 const SCREEN_PADDING = 48;
 const CARD_MARGIN = 12;
 const CARD_WIDTH = Dimensions.get('window').width - SCREEN_PADDING - CARD_MARGIN * 4;
 
+function storyItemToCardData(item: StoryItem): StoryCardData {
+  const name = item.user.username?.trim() || 'Member';
+  const initial =
+    name.toLowerCase() === 'anonymous' ? '?' : name.charAt(0).toUpperCase();
+  return {
+    id: item.id,
+    text: item.content,
+    authorName: name,
+    authorInitial: initial,
+    amountReceived: 0,
+    role: 'Receiver',
+  };
+}
+
 export function CommunityStories() {
+  const { signOut } = useCurrentUser();
+  const [stories, setStories] = useState<StoryCardData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const flatListRef = useRef<FlatList<CommunityStory>>(null);
+  const flatListRef = useRef<FlatList<StoryCardData>>(null);
+
+  const load = useCallback(
+    async (retryAfterRefresh = false) => {
+      setError(null);
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          setStories([]);
+          setLoading(false);
+          return;
+        }
+        const res = await getStoriesFeed(token, { page: 1, limit: 20 });
+        setStories(res.stories.map(storyItemToCardData));
+        setActiveIndex(0);
+      } catch (e) {
+        if (isUnauthorizedSessionError(e) && !retryAfterRefresh) {
+          const recovered = await recoverFromUnauthorized(signOut);
+          if (recovered) {
+            await load(true);
+            return;
+          }
+        }
+        setStories([]);
+        setError(e instanceof Error ? formatPlizApiErrorForUser(e) : 'Could not load stories.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [signOut]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      void load();
+    }, [load])
+  );
+
+  const count = stories.length;
+  const maxIndex = Math.max(0, count - 1);
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (count === 0) return;
       const offset = e.nativeEvent.contentOffset.x;
       const index = Math.round(offset / (CARD_WIDTH + CARD_MARGIN * 2));
-      setActiveIndex(Math.min(index, MOCK_COMMUNITY_STORIES.length - 1));
+      setActiveIndex(Math.min(Math.max(0, index), maxIndex));
     },
-    []
+    [count, maxIndex]
   );
 
   const goPrev = useCallback(() => {
@@ -43,16 +110,16 @@ export function CommunityStories() {
   }, [activeIndex]);
 
   const goNext = useCallback(() => {
-    if (activeIndex < MOCK_COMMUNITY_STORIES.length - 1) {
+    if (activeIndex < maxIndex) {
       flatListRef.current?.scrollToIndex({
         index: activeIndex + 1,
         animated: true,
       });
     }
-  }, [activeIndex]);
+  }, [activeIndex, maxIndex]);
 
   const renderItem = useCallback(
-    ({ item }: { item: CommunityStory }) => (
+    ({ item }: { item: StoryCardData }) => (
       <View style={styles.cardWrap}>
         <StoryCard story={item} />
       </View>
@@ -69,75 +136,85 @@ export function CommunityStories() {
         <Text style={styles.sectionTitle}>Community Stories</Text>
       </View>
 
-      <FlatList<CommunityStory>
-        ref={flatListRef}
-        data={MOCK_COMMUNITY_STORIES}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        horizontal
-        pagingEnabled={false}
-        snapToInterval={CARD_WIDTH + CARD_MARGIN * 2}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        showsHorizontalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={styles.carouselContent}
-        getItemLayout={(_, index) => ({
-          length: CARD_WIDTH + CARD_MARGIN * 2,
-          offset: (CARD_WIDTH + CARD_MARGIN * 2) * index,
-          index,
-        })}
-      />
-
-      <View style={styles.controls}>
-        <Pressable
-          onPress={goPrev}
-          style={[styles.arrow, activeIndex === 0 && styles.arrowDisabled]}
-          disabled={activeIndex === 0}
-          accessibilityLabel="Previous story"
-          accessibilityRole="button"
-        >
-          <Ionicons
-            name="chevron-back"
-            size={24}
-            color={activeIndex === 0 ? '#D1D5DB' : '#1F2937'}
-          />
-        </Pressable>
-
-        <View style={styles.dots}>
-          {MOCK_COMMUNITY_STORIES.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                i === activeIndex ? styles.dotActive : styles.dotInactive,
-              ]}
-            />
-          ))}
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="small" color="#2E8BEA" />
         </View>
-
-        <Pressable
-          onPress={goNext}
-          style={[
-            styles.arrow,
-            activeIndex === MOCK_COMMUNITY_STORIES.length - 1 && styles.arrowDisabled,
-          ]}
-          disabled={activeIndex === MOCK_COMMUNITY_STORIES.length - 1}
-          accessibilityLabel="Next story"
-          accessibilityRole="button"
-        >
-          <Ionicons
-            name="chevron-forward"
-            size={24}
-            color={
-              activeIndex === MOCK_COMMUNITY_STORIES.length - 1
-                ? '#D1D5DB'
-                : '#1F2937'
-            }
+      ) : error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : count === 0 ? (
+        <Text style={styles.emptyText}>
+          No approved stories yet. Share yours from a funded request or the stories screen.
+        </Text>
+      ) : (
+        <>
+          <FlatList<StoryCardData>
+            ref={flatListRef}
+            data={stories}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled={false}
+            snapToInterval={CARD_WIDTH + CARD_MARGIN * 2}
+            snapToAlignment="start"
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            contentContainerStyle={styles.carouselContent}
+            getItemLayout={(_, index) => ({
+              length: CARD_WIDTH + CARD_MARGIN * 2,
+              offset: (CARD_WIDTH + CARD_MARGIN * 2) * index,
+              index,
+            })}
           />
-        </Pressable>
-      </View>
+
+          <View style={styles.controls}>
+            <Pressable
+              onPress={goPrev}
+              style={[styles.arrow, activeIndex === 0 && styles.arrowDisabled]}
+              disabled={activeIndex === 0}
+              accessibilityLabel="Previous story"
+              accessibilityRole="button"
+            >
+              <Ionicons
+                name="chevron-back"
+                size={24}
+                color={activeIndex === 0 ? '#D1D5DB' : '#1F2937'}
+              />
+            </Pressable>
+
+            <View style={styles.dots}>
+              {stories.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    i === activeIndex ? styles.dotActive : styles.dotInactive,
+                  ]}
+                />
+              ))}
+            </View>
+
+            <Pressable
+              onPress={goNext}
+              style={[
+                styles.arrow,
+                activeIndex === maxIndex && styles.arrowDisabled,
+              ]}
+              disabled={activeIndex === maxIndex}
+              accessibilityLabel="Next story"
+              accessibilityRole="button"
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={24}
+                color={activeIndex === maxIndex ? '#D1D5DB' : '#1F2937'}
+              />
+            </Pressable>
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -164,6 +241,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#1F2937',
+  },
+  centered: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#B45309',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 8,
   },
   carouselContent: {
     paddingHorizontal: 12,

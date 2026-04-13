@@ -4,7 +4,7 @@ import { Text } from '@/components/Text';
 
 import { RequestCard } from './RequestCard';
 
-import type { TrendingRequest } from '@/mock/home';
+import type { TrendingRequest } from '@/lib/types/home';
 
 const HEADING = '#1F2937';
 const BRAND_BLUE = '#2E8BEA';

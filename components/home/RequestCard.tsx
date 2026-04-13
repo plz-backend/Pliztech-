@@ -5,7 +5,7 @@ import { Text } from '@/components/Text';
 
 import { ProgressBar } from '@/components/ProgressBar';
 
-import type { TrendingRequest } from '@/mock/home';
+import type { TrendingRequest } from '@/lib/types/home';
 
 const ACCENT_BLUE = '#2196F3';
 const HEADING = '#333333';

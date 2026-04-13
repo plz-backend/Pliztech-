@@ -7,7 +7,7 @@ import { Text } from '@/components/Text';
 import { ProgressBar } from '@/components/ProgressBar';
 import { REQUEST_CATEGORIES } from '@/constants/categories';
 
-import type { BrowseRequest } from '@/mock/home';
+import type { BrowseRequest } from '@/lib/types/home';
 
 const ACCENT_BLUE = '#2196F3';
 const HEADING = '#333333';

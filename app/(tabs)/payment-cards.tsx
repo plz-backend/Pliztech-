@@ -31,7 +31,7 @@ import {
   isUnauthorizedSessionError,
   recoverFromUnauthorized,
 } from '@/lib/auth/session-expired';
-import { formatExpiry } from '@/mock/payment-cards';
+import { formatExpiry } from '@/lib/types/payment-cards';
 
 const ACCENT_BLUE = '#2E8BEA';
 const BORDER_GRAY = '#E5E7EB';

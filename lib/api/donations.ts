@@ -1,8 +1,8 @@
 import { API_BASE_URL, apiUrl } from '@/constants/api';
 import { REQUEST_CATEGORIES } from '@/constants/categories';
 import { avatarColorFromSeed } from '@/contexts/CurrentUserContext';
-import type { GivingContribution } from '@/mock/activity';
-import type { RecentContribution } from '@/mock/home';
+import type { GivingContribution } from '@/lib/types/activity';
+import type { RecentContribution } from '@/lib/types/home';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 

@@ -3,16 +3,24 @@ import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/Text';
 
-import type { CommunityStory } from '@/mock/activity';
-
 const QUOTE_ICON = require('@/assets/images/quote-icon.png');
 
 function formatNaira(amount: number) {
-  return `₦${amount.toLocaleString()}`;
+  return '\u20A6' + amount.toLocaleString();
 }
 
+/** Carousel card payload (API-mapped). */
+export type StoryCardData = {
+  id: string;
+  text: string;
+  authorName: string;
+  authorInitial: string;
+  amountReceived: number;
+  role: 'Receiver' | 'Giver';
+};
+
 export interface StoryCardProps {
-  story: CommunityStory;
+  story: StoryCardData;
 }
 
 export function StoryCard({ story }: StoryCardProps) {

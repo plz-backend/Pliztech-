@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/Text';
 
 import { AppHeaderTitleRow } from '@/components/layout/AppHeaderTitleRow';
+import { KycVerificationBanner } from '@/components/profile/KycVerificationBanner';
 import { ProfileRow } from '@/components/profile/ProfileRow';
 import { ProfileSection } from '@/components/profile/ProfileSection';
 import { ProfileSummaryCard } from '@/components/profile/ProfileSummaryCard';
@@ -112,7 +113,7 @@ export default function ProfileScreen() {
       <AppHeaderTitleRow title="My Profile" backIconColor="#9CA3AF" />
 
       <View style={styles.content}>
-        <ProfileSummaryCard
+               <ProfileSummaryCard
           fullName={fullName}
           email={email}
           emailVerified={user?.isEmailVerified ?? false}
@@ -126,6 +127,10 @@ export default function ProfileScreen() {
           requests={requestsCount}
           isLoading={showCardLoading}
         />
+
+        {user && !isDocumentVerified(user) ? (
+          <KycVerificationBanner onPress={() => router.push('/(tabs)/kyc-verification')} />
+        ) : null}
 
         <ProfileSection title="User info">
           <ProfileRow
